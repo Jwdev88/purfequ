@@ -7,21 +7,21 @@ import { toast } from 'react-toastify'
 const Login = ({setToken}) => {
   const [email, setEmail] = useState ('')
   const [password,setPassword] = useState ('')
-  const onSumbitHandler = async (e) =>{
+  const onSumbitHandler = async (e) => {
     try {
       e.preventDefault();
-      const response = await axios.post(backendURI+'/api/user/admin',{email,password})
-      if(response.data.success){
-        setToken(response.data.token)
-      } else{
-        toast.error(response.data.message)
+      const response = await axios.post(backendURI + '/api/user/admin', { email, password }); // Corrected URL
+  
+      if (response.data.success) {
+        setToken(response.data.token);
+      } else {
+        toast.error(response.data.message);
       }
-
     } catch (error) {
       console.log(error);
-      toast.error(error.message)
+      toast.error(error.message);
     }
-  }
+  };
 
 
   return (
