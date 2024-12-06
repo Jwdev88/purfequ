@@ -77,31 +77,31 @@ const Login = ({ setToken }) => {
               <p className="text-red-500 text-xs mt-1">{errors.email}</p>
             )}
           </div>
-          <div className="mb-3">
-            <label htmlFor="password" className="text-sm font-medium text-gray-700 mb-2">
-              Password
-            </label>
-            <input
-              type={showPassword ? "text" : "password"}
-              id="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className={`rounded-md w-full px-3 py-2 border border-gray-300 outline-none ${
-                errors.password ? "border-red-500" : ""
-              }`}
-            />
-            {errors.password && (
-              <p className="text-red-500 text-xs mt-1">{errors.password}</p>
-            )}
+<div className="mb-3 relative"> 
+  <label htmlFor="password" className="text-sm font-medium text-gray-700 mb-2">
+    Password
+  </label>
+  <input
+    type={showPassword ? "text" : "password"}
+    id="password"
+    value={password}
+    onChange={(e) => setPassword(e.target.value)}
+    className={`rounded-md w-full px-3 py-2 border border-gray-300 outline-none ${
+      errors.password ? "border-red-500" : ""
+    }`}
+  />
+  {errors.password && (
+    <p className="text-red-500 text-xs mt-1">{errors.password}</p>
+  )}
 
-            <button
-              type="button"
-              onClick={togglePasswordVisibility}
-              className="text-blue-500 text-xs mt-1"
-            >
-              {showPassword ? "Hide" : "Show"}
-            </button>
-          </div>
+  <button
+    type="button"
+    onClick={togglePasswordVisibility}
+    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500" 
+  >
+    {showPassword ? "Hide" : "Show"}
+  </button>
+</div>
 
           <button
             type="submit"
