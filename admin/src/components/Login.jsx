@@ -74,7 +74,6 @@ const Login = ({ setToken }) => {
             />
             {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
           </div>
-
       <div className="mb-3"> 
             <label htmlFor="password" className="text-sm font-medium text-gray-700 mb-2">
               Password
@@ -98,6 +97,7 @@ const Login = ({ setToken }) => {
             >
               {showPassword ? 'Hide' : 'Show'} 
             </button>
+          </div>
 
           <button type="submit" className="mt-2 w-full py-2 px-4 rounded-md text-white bg-black">
             Login
