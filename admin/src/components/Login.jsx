@@ -76,7 +76,7 @@ const Login = ({setToken}) => {
     </div>
   );
 
- 
+ )
 }
 
 export default Login
