@@ -7,6 +7,11 @@ const Login = ({ setToken }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState({}); // State to store validation errors
+  const [showPassword, setShowPassword] = useState(false);
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
 
   const onSubmitHandler = async (e) => {
     e.preventDefault();
@@ -42,7 +47,7 @@ const Login = ({ setToken }) => {
     // Password validation
     if (!password) {
       errors.password = 'Password is required';
-    } else if (password.length < 6) {
+    } else if (password.length < 8) {
       errors.password = 'Password must be at least 6 characters';
     }
 
@@ -70,19 +75,26 @@ const Login = ({ setToken }) => {
             {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
           </div>
 
-          <div className="mb-3">
+       <div className="mb-3 relative"> 
             <label htmlFor="password" className="text-sm font-medium text-gray-700 mb-2">
               Password
             </label>
             <input
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className={`rounded-md w-full px-3 py-2 border border-gray-300 outline-none ${
                 errors.password ? 'border-red-500' : ''
-              }`} 
+              }`}
             />
+            <button
+              type="button"
+              onClick={togglePasswordVisibility}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center"
+            >
+              {showPassword ? 'Hide' : 'Show'} 
+            </button>
             {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
           </div>
 
