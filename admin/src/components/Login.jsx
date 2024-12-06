@@ -48,7 +48,7 @@ const Login = ({ setToken }) => {
     if (!password) {
       errors.password = 'Password is required';
     } else if (password.length < 8) {
-      errors.password = 'Password must be at least 6 characters';
+      errors.password = 'Password must be at least 8 characters';
     }
 
     return errors;
@@ -75,7 +75,7 @@ const Login = ({ setToken }) => {
             {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
           </div>
 
-       <div className="mb-3 relative"> 
+      <div className="mb-3"> 
             <label htmlFor="password" className="text-sm font-medium text-gray-700 mb-2">
               Password
             </label>
@@ -88,15 +88,16 @@ const Login = ({ setToken }) => {
                 errors.password ? 'border-red-500' : ''
               }`}
             />
+            {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
+
+            {/* Show/Hide button below the input */}
             <button
               type="button"
               onClick={togglePasswordVisibility}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center"
+              className="text-blue-500 text-xs mt-1" 
             >
               {showPassword ? 'Hide' : 'Show'} 
             </button>
-            {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
-          </div>
 
           <button type="submit" className="mt-2 w-full py-2 px-4 rounded-md text-white bg-black">
             Login
