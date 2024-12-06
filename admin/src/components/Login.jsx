@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
-import axios from 'axios';
-import { backendURI } from '../App';
-import { toast } from 'react-toastify';
+import React, { useState } from "react";
+import axios from "axios";
+import { backendURI } from "../App";
+import { toast } from "react-toastify";
 
 const Login = ({ setToken }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState({}); // State to store validation errors
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
 
   const togglePasswordVisibility = () => {
@@ -15,12 +15,15 @@ const Login = ({ setToken }) => {
 
   const onSubmitHandler = async (e) => {
     e.preventDefault();
-    const validationErrors = validateForm(); // Validate form data
-    setErrors(validationErrors); 
+    const validationErrors = validateForm();
+    setErrors(validationErrors);
 
-    if (Object.keys(validationErrors).length === 0) { // Proceed if no errors
+    if (Object.keys(validationErrors).length === 0) {
       try {
-        const response = await axios.post(backendURI + '/api/user/admin', { email, password });
+        const response = await axios.post(backendURI + "/api/user/admin", {
+          email,
+          password,
+        });
 
         if (response.data.success) {
           setToken(response.data.token);
@@ -37,18 +40,16 @@ const Login = ({ setToken }) => {
   const validateForm = () => {
     const errors = {};
 
-    // Email validation
     if (!email) {
-      errors.email = 'Email is required';
+      errors.email = "Email is required";
     } else if (!/\S+@\S+\.\S+/.test(email)) {
-      errors.email = 'Invalid email address';
+      errors.email = "Invalid email address";
     }
 
-    // Password validation
     if (!password) {
-      errors.password = 'Password is required';
+      errors.password = "Password is required";
     } else if (password.length < 8) {
-      errors.password = 'Password must be at least 8 characters';
+      errors.password = "Password must be at least 8 characters";
     }
 
     return errors;
@@ -69,37 +70,43 @@ const Login = ({ setToken }) => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className={`rounded-md w-full px-3 py-2 border border-gray-300 outline-none ${
-                errors.email ? 'border-red-500' : ''
-              }`} 
+                errors.email ? "border-red-500" : ""
+              }`}
             />
-            {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+            {errors.email && (
+              <p className="text-red-500 text-xs mt-1">{errors.email}</p>
+            )}
           </div>
-      <div className="mb-3"> 
+          <div className="mb-3">
             <label htmlFor="password" className="text-sm font-medium text-gray-700 mb-2">
               Password
             </label>
             <input
-              type={showPassword ? 'text' : 'password'}
+              type={showPassword ? "text" : "password"}
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className={`rounded-md w-full px-3 py-2 border border-gray-300 outline-none ${
-                errors.password ? 'border-red-500' : ''
+                errors.password ? "border-red-500" : ""
               }`}
             />
-            {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
+            {errors.password && (
+              <p className="text-red-500 text-xs mt-1">{errors.password}</p>
+            )}
 
-            {/* Show/Hide button below the input */}
             <button
               type="button"
               onClick={togglePasswordVisibility}
-              className="text-blue-500 text-xs mt-1" 
+              className="text-blue-500 text-xs mt-1"
             >
-              {showPassword ? 'Hide' : 'Show'} 
+              {showPassword ? "Hide" : "Show"}
             </button>
           </div>
 
-          <button type="submit" className="mt-2 w-full py-2 px-4 rounded-md text-white bg-black">
+          <button
+            type="submit"
+            className="mt-2 w-full py-2 px-4 rounded-md text-white bg-black"
+          >
             Login
           </button>
         </form>
