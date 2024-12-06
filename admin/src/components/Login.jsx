@@ -94,7 +94,7 @@ const Login = ({ setToken }) => {
               <p className="text-red-500 text-xs mt-1">{errors.password}</p>
             )}
           </div>
-
+           {showPassword ? "Hide Password" : "Show Password"}
           <button
             type="submit"
             className="mt-2 w-full py-2 px-4 rounded-md text-white bg-black"
@@ -108,7 +108,7 @@ const Login = ({ setToken }) => {
             onClick={togglePasswordVisibility}
             className="mt-2 w-full py-2 px-4 rounded-md text-blue-500 text-sm"
           >
-            {showPassword ? "Hide Password" : "Show Password"}
+           
           </button>
         </form>
       </div>
