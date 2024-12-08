@@ -8,8 +8,8 @@ import productRouter from './routes/productRoute.js';
 import cartRouter from './routes/cartRoute.js';
 import orderRouter from './routes/orederRoute.js';
 import rajaOngkirRouter from './routes/rajaOngkirRoute.js';
-
-
+import categoryRouter from './routes/categoryRoute.js';
+import subCategoryRouter from './routes/subCategoryRoute.js';
 
 //app config
 const app = express();
@@ -26,6 +26,8 @@ app.use('/api/product',productRouter)
 app.use('/api/cart', cartRouter)
 app.use('/api/order',orderRouter)
 app.use('/api/rajaongkir',rajaOngkirRouter)
+app.use('/api/category',categoryRouter)
+app.use('/api/subcategory',subCategoryRouter)
 
 app.get('/',(req,res)=>{
     res.send("Api berjalan ")

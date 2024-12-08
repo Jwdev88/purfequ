@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios'
-import { backendURI } from '../App'
+import { backendURI } from "../../App";
+
 import { toast } from 'react-toastify'
 import { NavLink, Link } from 'react-router-dom'
-import { assets } from '../assets/assets'
+import { assets } from "../../assets/assets";
+
 const List = ({ token }) => {
 
   const [list, setList] = useState([])
@@ -14,6 +16,7 @@ const List = ({ token }) => {
 
       if (response.data.success) {
         setList(response.data.products);
+        console.log(response.data.products)
 
       } else {
         toast.error(response.data.message)
@@ -27,7 +30,7 @@ const List = ({ token }) => {
 
   const removeProduct = async (id) => {
     try {
-      const response = await axios.post(backendURI + '/api/product/remove', { id }, { headers: { token } })
+      const response = await axios.post(backendURI + '/api/product/delete', { id }, { headers: { token } })
 
       if (response.data.success) {
         toast.success(response.data.message)

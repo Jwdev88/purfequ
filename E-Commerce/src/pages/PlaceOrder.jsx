@@ -47,7 +47,7 @@ const PlaceOrder = () => {
     const updateCostAndFormData = async () => {
       setCost(null);
       setIsLoadingCost(true);
-
+      
       if (selectedCity) {
         try {
           const result = await calculateCost(selectedCity, 1000, "jne");

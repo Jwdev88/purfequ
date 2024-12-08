@@ -207,19 +207,7 @@ const ShopContextProvider = (props) => {
             toast.error(error.message)
         }
     }
-    // const increaseQuantity = (itemId, size) => {
-    //     const currentQuantity = cartItems[itemId]?.[size] || 0;
-    //     updateQuanity(itemId, size, currentQuantity + 1);
-    // };
 
-    // const decreaseQuantity = (itemId, size) => {
-    //     const currentQuantity = cartItems[itemId]?.[size] || 0;
-    //     if (currentQuantity > 1) {
-    //         updateQuanity(itemId, size, currentQuantity - 1);
-    //     } else if (currentQuantity === 1) {
-    //         updateQuanity(itemId, size, 0); // Remove item if quantity is 1
-    //     }
-    // };
 
     const clearCart = (token) => {
         setCartItems({});

@@ -2,13 +2,14 @@ import React, { useEffect, useState } from "react";
 import Navbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";
 import { Routes, Route } from "react-router-dom";
-import Add from "./pages/Add";
-import List from "./pages/List";
-import Orders from "./pages/Orders";
+import Add from "./pages/product/Add";
+import List from "./pages/product/List";
+import Orders from "./pages/product/Orders";
+import UpdateProduct from "./pages/product/UpdateProduct";
 import Login from "./components/Login";
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import UpdateProduct from "./pages/UpdateProduct";
+
 
 export const backendURI = import.meta.env.VITE_BACKEND_URL
 

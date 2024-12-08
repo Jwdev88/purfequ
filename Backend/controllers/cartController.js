@@ -5,7 +5,12 @@ export const getUserCart = async (req, res) => {
   try {
     const { userId, itemId, size } = req.body;
 
-    const userData = await userModel.findById(userId);
+    const userData = await userModel.findByIdAndUpdate(userId);
+
+    if (!userData) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
     let cartData = await userData.cartData;
     res.json({ success: true, cartData });
   } catch (error) {
@@ -62,7 +67,7 @@ export const clearCart = async (req, res) => {
   try {
     const userId = req.user._id// Asumsikan Anda menggunakan middleware authentication
 
-    await userModel.findByIdAndDelete(userId, { cartData: {} });
+    await userModel.findByIdAndUpdate(userId, { cartData: {} });
 
     res.json({ success: true, message: "Cart cleared successfully" });
   } catch (error) {

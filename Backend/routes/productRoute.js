@@ -1,18 +1,47 @@
-import express  from "express";
-import {addProduct,removeProduct,singleProduct,listProducts,updateProduct} from "../controllers/productController.js"
+import express from "express";
+import {
+  addProduct,
+  deleteProduct,
+  getProductById,
+  getProducts,
+  updateProduct,
+} from "../controllers/productController.js";
 import upload from "../middleware/multer.js";
 import adminAuth from "../middleware/adminAuth.js";
 
-
 const productRouter = express.Router();
 
-productRouter.post('/add',adminAuth,upload.fields([{name:'image1',maxCount:1},{name:'image2',maxCount:1},{name:'image3',maxCount:1},{name:'image4',maxCount:1}]), addProduct)
-productRouter.post('/remove',adminAuth, removeProduct)
-productRouter.get('/:Id/single', singleProduct)
-productRouter.get('/list', listProducts)
-productRouter.put('/update/:productId',adminAuth,upload.fields([{name:'image1',maxCount:1},{name:'image2',maxCount:1},{name:'image3',maxCount:1},{name:'image4',maxCount:1}]), updateProduct)
-
-
-
+productRouter.post(
+  "/add",
+ 
+  upload.fields([
+    { name: "image1", maxCount: 1 },
+    { name: "image2", maxCount: 1 },
+    { name: "image3", maxCount: 1 },
+    { name: "image4", maxCount: 1 },
+  ]),
+  (req, res) => { 
+    try {
+      addProduct(req, res);
+    } catch (error) {
+      console.error("Error in addProduct:", error);
+      res.status(500).json({ success: false, message: "Failed to add product" });
+    }
+  }
+);
+productRouter.post("/delete", adminAuth, deleteProduct);
+productRouter.get("/:Id/get", getProductById);
+productRouter.get("/list", getProducts);
+productRouter.put(
+  "/update/:productId",
+  adminAuth,
+  upload.fields([
+    { name: "image1", maxCount: 1 },
+    { name: "image2", maxCount: 1 },
+    { name: "image3", maxCount: 1 },
+    { name: "image4", maxCount: 1 },
+  ]),
+  updateProduct
+);
 
 export default productRouter;
