@@ -10,6 +10,7 @@ const Add = ({ token }) => {
   const [categories, setCategories] = useState([]);
   const [subCategories, setSubCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true)
+  const [variants, setVariants] = useState([])
   const initialValues = {
     image1: null,
     image2: null,
@@ -92,7 +93,7 @@ const Add = ({ token }) => {
       } else {
         totalStock = values.stock;
       }
-      
+
       // Append total stock to formData
       formData.append("stock", totalStock);
       for (let key in values) {
@@ -100,11 +101,11 @@ const Add = ({ token }) => {
           formData.append(key, values[key]);
         } else if (key === "variants") {
           // Periksa apakah values.variants adalah array dan tidak kosong
-          if (Array.isArray(values.variants) && values.variants.length > 0) {  
+          if (Array.isArray(values.variants) && values.variants.length > 0) {
             // Kirim setiap varian sebagai object terpisah
-            values.variants.forEach((variant, index) => { 
+            values.variants.forEach((variant, index) => {
               formData.append(`variants[${index}]`, JSON.stringify(variant));
-          
+
             });
           }
         } else {
@@ -293,6 +294,11 @@ const Add = ({ token }) => {
                       type="text"
                       placeholder="Name"
                       name={`variants[${index}].name`}
+                      onChange={(e) => {
+                      const updatedVariants = [...variants];
+                      updatedVariants[index].name = e.target.value;
+                      setVariants(updatedVariants); // Perbarui state variants
+                      }}
                       className="shadow appearance-none border rounded-md w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <ErrorMessage name={`variants[${index}].name`} component="div" className="text-red-500" />
@@ -303,6 +309,11 @@ const Add = ({ token }) => {
                       type="number"
                       placeholder="Stock"
                       name={`variants[${index}].stock`}
+                      onChange={(e) => {
+                        const updatedVariants = [...variants];
+                        updatedVariants[index].name = e.target.value;
+                        setVariants(updatedVariants); // Perbarui state variants
+                      }}
                       className="shadow appearance-none border rounded-md w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <ErrorMessage name={`variants[${index}].stock`} component="div" className="text-red-500" />
@@ -311,6 +322,11 @@ const Add = ({ token }) => {
                       type="number"
                       placeholder="Price"
                       name={`variants[${index}].price`}
+                      onChange={(e) => {
+                        const updatedVariants = [...variants];
+                        updatedVariants[index].name = e.target.value;
+                        setVariants(updatedVariants); // Perbarui state variants
+                      }}
                       className="shadow appearance-none border rounded-md w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <ErrorMessage name={`variants[${index}].price`} component="div" className="text-red-500" />
@@ -319,6 +335,11 @@ const Add = ({ token }) => {
                       type="number"
                       placeholder="Berat (gram)"
                       name={`variants[${index}].berat`}
+                      onChange={(e) => {
+                        const updatedVariants = [...variants];
+                        updatedVariants[index].name = e.target.value;
+                        setVariants(updatedVariants); // Perbarui state variants
+                      }}
                       className="shadow appearance-none border rounded-md w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <ErrorMessage name={`variants[${index}].berat`} component="div" className="text-red-500" />
@@ -327,20 +348,25 @@ const Add = ({ token }) => {
                       type="text"
                       placeholder="sku"
                       name={`variants[${index}].sku`}
+                      onChange={(e) => {
+                        const updatedVariants = [...variants];
+                        updatedVariants[index].name = e.target.value;
+                        setVariants(updatedVariants); // Perbarui state variants
+                      }}
                       className="shadow appearance-none border rounded-md w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <ErrorMessage name={`variants[${index}].sku`} component="div" className="text-red-500" />
 
                     <button
                       type="button"
-                      onClick={() =>
-                        setFieldValue(
-                          "variants",
-                          values.variants.filter((_, i) => i !== index)
-                        )
-                      }
+                      onClick={() => {
+                        setVariants([
+                          ...variants,
+                          { name: "", stock: 0, price: 0, sku: "", weight: 0 },
+                        ]);
+                      }}
                       className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-3 rounded-md items-center"
-                    >
+                      >
                       Remove
                     </button>
                   </div>
@@ -348,12 +374,12 @@ const Add = ({ token }) => {
               ))}
               <button
                 type="button"
-                onClick={() =>
-                  setFieldValue("variants", [
-                    ...values.variants,
-                    { name: "", options: [{ name: "", stock: 0, price: 0, sku: "", weight: 0 }] }, // Updated structure
-                  ])
-                }
+                onClick={() => {
+                  setVariants([
+                    ...variants,
+                    { name: "", stock: 0, price: 0, sku: "", weight: 0 },
+                  ]);
+                }}
                 className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md"
               >
                 Add Variant
