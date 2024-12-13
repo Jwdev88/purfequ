@@ -19,9 +19,9 @@ const productSchema = new mongoose.Schema({
   //   ref: "Shop", // Relasi dengan model Shop (toko)
   //   required: true,
   // },
-  price: { type: Number, required: true },
+  price: { type: Number},
   // discount: { type: Number, default: 0 }, // Diskon dalam persen
-  stock: { type: Number, required: true },
+  stock: { type: Number},
   weight: { type: Number }, // Dalam gram
   // condition: { type: String, enum: ["new", "used"], default: "new" }, // Kondisi produk
   // minOrder: { type: Number, default: 1 }, // Minimum order quantity
@@ -36,10 +36,10 @@ const productSchema = new mongoose.Schema({
         {
           name: { type: String, required: true }, // Nama opsi (misal: "Merah")
           stock: { type: Number, required: true },
-          price: { type: Number }, // Harga bisa berbeda per varian
-          sku: { type: String }, // SKU untuk varian
+          price: { type: Number, required: true }, // Harga bisa berbeda per varian
+          sku: { type: String, unique: true }, // SKU untuk varian
           // image: { type: String }, // Gambar untuk varian
-          weight: { type: Number }, // Berat dalam gram
+          weight: { type: Number, required: true }, // Berat dalam gram
         },
       ],
     },
@@ -58,7 +58,6 @@ productSchema.pre("save", function (next) {
   next();
 });
 
-const Product =
-  mongoose.models.product || mongoose.model("product", productSchema);
+const Product = mongoose.models.product || mongoose.model("product", productSchema);
 
 export default Product;

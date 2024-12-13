@@ -1,9 +1,9 @@
 import { v2 as cloudinary } from "cloudinary";
 import Product from "../models/productModel.js";
+import Category from "../models/categoryModel.js";
 import mongoose from "mongoose";
 
 const addProduct = async (req, res) => {
-
   const calculateTotalStock = (variants) => {
     if (!variants || variants.length === 0) {
       return 0; // Handle empty variants array
@@ -19,12 +19,12 @@ const addProduct = async (req, res) => {
     }, 0);
   };
   try {
-    
     const {
       name,
       description,
       price,
       stock,
+      weight,
       category,
       subCategory,
       variants,
@@ -49,33 +49,33 @@ const addProduct = async (req, res) => {
         return result.secure_url;
       })
     );
-    let parsedVariants = []; 
-    if (typeof variants === 'string' && variants.trim() !== '') { 
+    let parsedVariants = [];
+    if (typeof variants === "string" && variants.trim() !== "") {
       try {
         parsedVariants = JSON.parse(variants);
       } catch (error) {
         console.error("Error parsing variants:", error);
         // Tangani error parsing, misalnya dengan memberikan response error
-        return res.status(400).json({ 
-          success: false, 
-          message: "Invalid variants data" 
+        return res.status(400).json({
+          success: false,
+          message: "Invalid variants data",
         });
       }
     }
-    
+
     const productData = {
       name,
       description,
       category,
       price: Number(price),
       stock: Number(stock),
+      weight: Number(weight),
       subCategory,
       bestseller: bestseller === "true" ? true : false,
       variants: parsedVariants,
       images: imagesURI, // Menggunakan 'images' sesuai skema
-      stock: calculateTotalStock(parsedVariants),// Menghitung total stok dari varian
-      weight: 0,
-      sku,
+      stock: calculateTotalStock(parsedVariants), // Menghitung total stok dari varian
+      sku: sku,
       // calculateAverageWeight(JSON.parse(variants)), // Menghitung rata-rata berat dari varian (opsional)
     };
 
@@ -85,27 +85,29 @@ const addProduct = async (req, res) => {
     res
       .status(201)
       .json({ success: true, message: "Product berhasil ditambahkan" });
-      console.log(product);
+    console.log(product);
   } catch (error) {
     console.error(error);
     res.json({ success: false, message: error.message });
   }
   // Fungsi untuk menghitung total stok dari semua varian
-
 };
 
-const updateProduct = async (req, res) => {
+const editProduct = async (req, res) => {
   try {
     const { productId } = req.params;
     const {
       name,
       description,
-      price,
       category,
       subCategory,
       variants,
       bestseller,
+      price,
       weight,
+      stock,
+      sku,
+     
     } = req.body;
 
     const image1 = req.files.image1 && req.files.image1[0];
@@ -127,7 +129,9 @@ const updateProduct = async (req, res) => {
       subCategory: subCategory,
       variants: variants ? JSON.parse(variants) : undefined, // Menggunakan variants
       bestseller: bestseller === "true" ? true : false,
-      stock: variants ? calculateTotalStock(JSON.parse(variants)) : undefined, // Update stok
+      stock: stock,
+      // stock: variants ,
+      // ? calculateTotalStock(JSON.parse(variants)) : undefined, // Update stok
       weight: weight,
       // variants ? calculateAverageWeight(JSON.parse(variants)) : undefined, // Update berat (opsional)
     };
@@ -173,10 +177,10 @@ const updateProduct = async (req, res) => {
 };
 const deleteProduct = async (req, res) => {
   try {
-    const deletedProduct = await Product.findByIdAndDelete(req.params.id);
+    const deletedProduct = await Product.findByIdAndDelete(req.body.id);
     if (!deletedProduct)
       return res.status(404).json({ message: "Produk tidak ditemukan" });
-    res.status(200).json({ message: "Produk berhasil dihapus" });
+    res.status(200).json({ message: true, message: "Produk berhasil dihapus" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -184,34 +188,41 @@ const deleteProduct = async (req, res) => {
 
 const getProductById = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.Id).populate(
-      "category subCategory"
-    );
-    if (!product)
-      return res.status(404).json({ message: "Produk tidak ditemukan" });
-    res.status(200).json(product);
-    console.log(product);
+    const { Id } = req.params;
+
+    if (!Id || !mongoose.Types.ObjectId.isValid(Id)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid productId" });
+    }
+
+    const product = await Product.findById(Id)
+    .populate("category subCategory")
+    .populate("variants")
+    .populate("variants.options");
+    res.json({ success: true, product });
   } catch (error) {
-    res.status(500).json({ message: error.message });
     console.log(error);
+    res.json({ success: false, message: error.message });
   }
 };
 
 const getProducts = async (req, res) => {
   try {
-    const products = await Product.find().populate("category subCategory");
-    res.status(200).json(products);
-    console.log(products);
+    const products = await Product.find({})
+      .populate("category")
+      .populate("category subCategory")
+
+      .populate("variants")
+      .populate("variants.options");
+    res.status(200).json({ success: true, products: products });
   } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: error.message });
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: "Gagal memuat data produk.",
+    });
   }
 };
 
-export {
-  addProduct,
-  deleteProduct,
-  getProductById,
-  getProducts,
-  updateProduct,
-};
+export { addProduct, deleteProduct, getProductById, getProducts, editProduct };

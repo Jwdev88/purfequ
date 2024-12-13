@@ -1,11 +1,10 @@
-import React from 'react'
-import { useState } from 'react';
-import { useEffect } from 'react';
-import { backendURI } from "../../App";
-
+import React,{useState,useEffect} from 'react'
 import { toast } from 'react-toastify'
 import axios from 'axios'
-import { assets } from "../../assets/assets";
+import { backendURI } from "../../App";
+
+
+
 
 const Orders = ({ token }) => {
 

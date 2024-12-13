@@ -1,28 +1,25 @@
 import React, { useState, useEffect } from "react";
 import { Formik, Form, Field, ErrorMessage } from "formik";
 import * as Yup from "yup";
-import { assets } from "../../assets/assets";
+import { UploadIcon } from "lucide-react";
 import axios from "axios";
 import { backendURI } from "../../App";
-import { toast } from "react-toastify";
-import { useParams, useNavigate } from "react-router-dom";
 
-const UpdateProduct = ({ token }) => {
-  const { productId } = useParams(); // Get product ID from URL
-  const navigate = useNavigate(); // For redirection after successful update
+import { toast } from "react-toastify";
+
+const Add = ({ token }) => {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [categories, setCategories] = useState([]);
   const [subCategories, setSubCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [initialValues, setInitialValues] = useState({
-    // Define initialValues here
+  const initialValues = {
     image1: null,
     image2: null,
     image3: null,
     image4: null,
     name: "",
     description: "",
-    sku: "",
+    sku: 0,
     price: 0,
     stock: 0,
     weight: 0,
@@ -30,55 +27,85 @@ const UpdateProduct = ({ token }) => {
     subCategory: "",
     bestseller: false,
     variants: [],
+  };
+  const validationSchema = Yup.object().shape({
+    name: Yup.string().required("Nama wajib diisi"),
+    description: Yup.string().required("Deskripsi wajib diisi"),
+    category: Yup.string().required("Kategori wajib diisi"),
+    subCategory: Yup.string().required("Subkategori wajib diisi"),
+    // sku: Yup.string().required("SKU wajib diisi"),
+    // stock: Yup.number().required("Stok wajib diisi").integer("Stok harus berupa bilangan bulat").min(1, "Stok tidak boleh kosong"),
+    // price: Yup.number().required("Harga wajib diisi").positive("Harga harus positif"),
+    // weight: Yup.number().required("Berat wajib diisi").min(100, "Berat minimal 100 gram"),
+    // // Conditional validation for stock
+
+    stock: Yup.number().when("variants", (variants, schema) => {
+      return variants && variants.length > 0 // Check if variants array is NOT empty
+        ? schema.nullable()
+        : schema
+            .required("Stok wajib diisi")
+            .integer("Stok harus berupa bilangan bulat")
+            .min(0, "Stok tidak boleh kosong");
+    }),
+    // Conditional validation for price
+    price: Yup.number().when("variants", (variants, schema) => {
+      return variants && variants.length > 0 // Check if variants array is NOT empty
+        ? schema.nullable()
+        : schema.required("Harga wajib diisi").positive("Harga harus positif");
+    }),
+
+    // Conditional validation for SKU
+
+    // sku: Yup.string().when("variants", (variants, schema) => {
+
+    //   return variants && variants.length > 0 // Check if variants array is NOT empty
+
+    //     ? schema.nullable()
+
+    //     : schema.required("SKU wajib diisi");
+
+    // }),
+
+    // Conditional validation for weight
+
+    weight: Yup.number().when("variants", (variants, schema) => {
+      return variants && variants.length > 0 // Check if variants array is NOT empty
+        ? schema.nullable()
+        : schema.required("Berat wajib diisi").min(0, "Berat minimal 100 gram");
+    }),
+
+    variants: Yup.array().of(
+      Yup.object().shape({
+        name: Yup.string().required("Nama varian wajib diisi"),
+        options: Yup.array().of(
+          Yup.object().shape({
+            name: Yup.string().required("Nama opsi wajib diisi"),
+            stock: Yup.number()
+              .required("Stok wajib diisi")
+              .integer("Stok harus berupa bilangan bulat"),
+            price: Yup.number()
+              .required("Harga wajib diisi")
+              .positive("Harga harus positif"),
+            sku: Yup.string().required("SKU wajib diisi"),
+            weight: Yup.number()
+              .required("Berat wajib diisi")
+              .min(0, "Berat minimal 100 gram"),
+          })
+        ),
+      })
+    ),
   });
 
   useEffect(() => {
-    const fetchProductDetails = async () => {
-      try {
-        const response = await axios.get(
-          `${backendURI}/api/product/${productId}/get`, // Updated endpoint
-          {
-            headers: { token },
-          }
-        );
-        if (response.data.success) {
-          const productData = response.data.product;
-          setInitialValues({
-            ...productData,
-            // Need to adjust the structure to match the form fields
-            category: productData.category._id,
-            subCategory: productData.subCategory._id,
-          });
-          setSelectedCategory(productData.category._id);
-          console.log(productData);
-
-          
-        } else {
-          toast.error("Failed to fetch product details");
-        }
-      } catch (error) {
-        console.error("Error fetching product details:", error);
-        toast.error("Error fetching product details");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchProductDetails();
-  }, [productId, token]);
-
-
-  useEffect(() => {
     const fetchCategories = async () => {
-      setIsLoading(true);
       try {
+        setIsLoading(true);
         const response = await axios.get(backendURI + "/api/category/list", {
           headers: { token },
         });
         setCategories(response.data.categories);
       } catch (error) {
-        console.error("Error fetching categories:", error);
-        toast.error("Gagal mengambil data Category");
+        toast.error("Gagal mengambil data Category:", error.message);
       } finally {
         setIsLoading(false);
       }
@@ -87,72 +114,91 @@ const UpdateProduct = ({ token }) => {
     fetchCategories();
   }, [token]);
 
+  // Fetch subcategories when token changes
   useEffect(() => {
     const fetchSubCategories = async () => {
-      if (selectedCategory) {
-        try {
-          const response = await axios.get(
-            `${backendURI}/api/subcategory/list?category=${selectedCategory}`,
-            { headers: { token } }
-          );
-          setSubCategories(response.data.subCategories);
-        } catch (error) {
-          console.error("Error fetching subcategories:", error);
-          toast.error("Gagal mengambil data subCategory");
-        }
-      } else {
-        // Clear subCategories when no category is selected
-        setSubCategories([]);
+      try {
+        setIsLoading(true);
+        const response = await axios.get(
+          `${backendURI}/api/subcategory/list`,
+          {
+            headers: { token },
+          }
+        );
+        setSubCategories(response.data.subCategories);
+      } catch (error) {
+        toast.error("Gagal mengambil data Subcategory:", error.message);
+      } finally {
+        setIsLoading(false);
       }
     };
 
     fetchSubCategories();
-  }, [selectedCategory, token]);
-
-  const validationSchema = Yup.object().shape({
-    name: Yup.string().required("Nama wajib diisi"),
-    description: Yup.string().required("Deskripsi wajib diisi"),
-    category: Yup.string().required("Kategori wajib diisi"),
-    subCategory: Yup.string().required("Subkategori wajib diisi"),
-    // ... other validations ...
-  });
+  }, [token, selectedCategory]);
 
   const onSubmitHandler = async (values) => {
     try {
       const formData = new FormData();
+      let totalStock = 0;
+      if (values.variants.length > 0) {
+        for (const variant of values.variants) {
+          for (const option of variant.options) {
+            totalStock += option.stock;
+          }
+        }
+      } else {
+        totalStock = values.stock;
+      }
 
-      // Append product ID to formData
-      formData.append("productId", productId);
+      // Append total stock to formData
+      formData.append("stock", totalStock);
 
       for (let key in values) {
         if (key.startsWith("image") && values[key]) {
           formData.append(key, values[key]);
         } else if (key === "variants") {
-          formData.append(key, JSON.stringify(values.variants));
+          // Periksa apakah values.variants adalah array dan tidak kosong
+          if (Array.isArray(values.variants) && values.variants.length > 0) {
+            // Kirim setiap varian sebagai object terpisah
+            values.variants.forEach((variant, index) => {
+              formData.append(`variants[${index}]`, JSON.stringify(variant));
+            });
+          }
         } else {
           formData.append(key, values[key]);
         }
       }
+      // for (let key in values) {
+      //   if (key.startsWith("image") && values[key]) {
+      //     formData.append(key, values[key]);
+      //   } else if (key === "variants") {
+      //     // Stringify the variants array
+      //     formData.append(key, JSON.stringify(values.variants));
+      //   } else {
+      //     formData.append(key, values[key]);
+      //   }
+      // }
 
-      const response = await axios.put(
-        `${backendURI}/api/product/edit/${productId}`, // Use update endpoint with product ID
+      const response = await axios.post(
+        backendURI + "/api/product/add",
         formData,
         { headers: { token } }
       );
 
       if (response.data.success) {
         toast.success(response.data.message);
-        // Redirect to product list after successful update
-        navigate("/product/list");
+        // Reset form setelah berhasil
+        // ...
+        console.log(response.data);
       } else {
         toast.error(response.data.message);
+        console.log(response.data);
       }
     } catch (error) {
       console.error(error);
       toast.error(error.message);
     }
   };
-
   return (
     <Formik
       initialValues={initialValues}
@@ -167,11 +213,20 @@ const UpdateProduct = ({ token }) => {
             <p className="mb-2 text-lg font-semibold">Upload Images</p>
             <div className="flex gap-4">
               {["image1", "image2", "image3", "image4"].map((imageKey) => (
-                <label htmlFor={imageKey} key={imageKey} className="cursor-pointer">
+                <label
+                  htmlFor={imageKey}
+                  key={imageKey}
+                  className="cursor-pointer"
+                >
                   <img
                     className="w-24 h-24 object-cover border-2 border-dashed border-gray-300 rounded-md"
-                    src={!values[imageKey] ? assets.upload_area : URL.createObjectURL(values[imageKey])}
-                    alt={`Placeholder for ${imageKey} upload area`}
+                    src={
+                      !values[imageKey] ? (
+                        <UploadIcon className="w-24 h-24 object-cover border-2 border-dashed border-gray-300 rounded-md" />
+                      ) : (
+                        URL.createObjectURL(values[imageKey])
+                      )
+                    }
                   />
                   <input
                     onChange={(e) => setFieldValue(imageKey, e.target.files[0])}
@@ -192,9 +247,12 @@ const UpdateProduct = ({ token }) => {
               className="w-full max-w-[600px] px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Type Here"
               type="text"
-            
             />
-            <ErrorMessage name="name" component="div" className="text-red-500" />
+            <ErrorMessage
+              name="name"
+              component="div"
+              className="text-red-500"
+            />
           </div>
 
           {/* Product Description */}
@@ -206,9 +264,12 @@ const UpdateProduct = ({ token }) => {
               className="w-full max-w-[600px] px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Type content here"
             />
-            <ErrorMessage name="description" component="div" className="text-red-500" />
+            <ErrorMessage
+              name="description"
+              component="div"
+              className="text-red-500"
+            />
           </div>
-
 
           {isLoading ? (
             <div>Loading categories and subcategories...</div>
@@ -216,7 +277,10 @@ const UpdateProduct = ({ token }) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-auto">
               {/* Category select */}
               <div className="mb-6">
-                <label htmlFor="category" className="block text-gray-700 text-sm font-semibold mb-2">
+                <label
+                  htmlFor="category"
+                  className="block text-gray-700 text-sm font-semibold mb-2"
+                >
                   Product Category
                 </label>
                 <Field
@@ -225,25 +289,32 @@ const UpdateProduct = ({ token }) => {
                   id="category"
                   onChange={(e) => {
                     setFieldValue("category", e.target.value); // Update Formik's 'category'
-                    setSelectedCategory(e.target.value);   // Update 'selectedCategory' state
+                    setSelectedCategory(e.target.value); // Update 'selectedCategory' state
                   }}
                   className="shadow appearance-none border rounded-md py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 w-60"
                 >
-
-                  <option value="">Select a Category</option> Added a default option
+                  <option value="">Select a Category</option> Added a default
+                  option
                   {categories.map((category) => (
                     <option key={category._id} value={category._id}>
-
-                      {category.name.toUpperCase()} {/* Access the name property */}
+                      {category.name.toUpperCase()}{" "}
+                      {/* Access the name property */}
                     </option>
                   ))}
                 </Field>
-                <ErrorMessage name="category" component="div" className="text-red-500" />
+                <ErrorMessage
+                  name="category"
+                  component="div"
+                  className="text-red-500"
+                />
               </div>
 
               {/* Subcategory select */}
               <div className="mb-6">
-                <label htmlFor="subCategory" className="block text-gray-700 text-sm font-semibold mb-2">
+                <label
+                  htmlFor="subCategory"
+                  className="block text-gray-700 text-sm font-semibold mb-2"
+                >
                   Product Subcategory
                 </label>
                 <Field
@@ -259,9 +330,12 @@ const UpdateProduct = ({ token }) => {
                     </option>
                   ))}
                 </Field>
-                <ErrorMessage name="subCategory" component="div" className="text-red-500" />
+                <ErrorMessage
+                  name="subCategory"
+                  component="div"
+                  className="text-red-500"
+                />
               </div>
-
             </div>
           )}
 
@@ -277,7 +351,11 @@ const UpdateProduct = ({ token }) => {
                   placeholder="Type Here"
                   type="text"
                 />
-                <ErrorMessage name="sku" component="div" className="text-red-500" />
+                <ErrorMessage
+                  name="sku"
+                  component="div"
+                  className="text-red-500"
+                />
               </div>
 
               {/* Product Stock */}
@@ -289,7 +367,11 @@ const UpdateProduct = ({ token }) => {
                   placeholder="Type Here"
                   type="number"
                 />
-                <ErrorMessage name="stock" component="div" className="text-red-500" />
+                <ErrorMessage
+                  name="stock"
+                  component="div"
+                  className="text-red-500"
+                />
               </div>
 
               {/* Product Price */}
@@ -301,7 +383,11 @@ const UpdateProduct = ({ token }) => {
                   placeholder="Type Here"
                   type="number"
                 />
-                <ErrorMessage name="price" component="div" className="text-red-500" />
+                <ErrorMessage
+                  name="price"
+                  component="div"
+                  className="text-red-500"
+                />
               </div>
 
               {/* Product Weight */}
@@ -313,14 +399,16 @@ const UpdateProduct = ({ token }) => {
                   placeholder="Type Here"
                   type="number"
                 />
-                <ErrorMessage name="weight" component="div" className="text-red-500" />
+                <ErrorMessage
+                  name="weight"
+                  component="div"
+                  className="text-red-500"
+                />
               </div>
             </div>
           )}
 
           {/* Category, Subcategory */}
-
-
 
           {/* Product Variants */}
           <div className="w-auto">
@@ -331,9 +419,15 @@ const UpdateProduct = ({ token }) => {
             )}
             <div>
               {values.variants.map((variant, index) => (
-                <div key={index} className="flex flex-col mb-3 border gap-3 p-4 rounded-md">
+                <div
+                  key={index}
+                  className="flex flex-col mb-3 border gap-3 p-4 rounded-md"
+                >
                   <div>
-                    <label htmlFor={`variants[${index}].name`} className="block text-gray-700 text-sm font-bold mb-2">
+                    <label
+                      htmlFor={`variants[${index}].name`}
+                      className="block text-gray-700 text-sm font-bold mb-2"
+                    >
                       Variant Name:
                     </label>
                     <Field
@@ -342,14 +436,19 @@ const UpdateProduct = ({ token }) => {
                       name={`variants[${index}].name`}
                       className="shadow appearance-none border rounded-md w-70 py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
-                    <ErrorMessage name={`variants[${index}].name`} component="div" className="text-red-500" />
+                    <ErrorMessage
+                      name={`variants[${index}].name`}
+                      component="div"
+                      className="text-red-500"
+                    />
                   </div>
                   <div>
                     {variant.options.map((option, optionIndex) => (
-                      <div key={optionIndex} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-[10rem,1.5fr,2.0fr,1.5fr,1.25fr,1fr] gap-4 mb-2 w-full">
+                      <div
+                        key={optionIndex}
+                        className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-[10rem,1.5fr,2.0fr,1.5fr,1.25fr,1fr] gap-4 mb-2 w-full"
+                      >
                         {/* Responsive grid for options */}
-
-
 
                         <Field
                           type="text"
@@ -357,7 +456,11 @@ const UpdateProduct = ({ token }) => {
                           name={`variants[${index}].options[${optionIndex}].name`}
                           className="shadow appearance-none border rounded-md w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
-                        <ErrorMessage name={`variants[${index}].options[${optionIndex}].name`} component="div" className="text-red-500" />
+                        <ErrorMessage
+                          name={`variants[${index}].options[${optionIndex}].name`}
+                          component="div"
+                          className="text-red-500"
+                        />
 
                         <Field
                           type="number"
@@ -372,7 +475,11 @@ const UpdateProduct = ({ token }) => {
                           name={`variants[${index}].options[${optionIndex}].price`}
                           className="shadow appearance-none border rounded-md w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
-                        <ErrorMessage name={`variants[${index}].options[${optionIndex}].price`} component="div" className="text-red-500" />
+                        <ErrorMessage
+                          name={`variants[${index}].options[${optionIndex}].price`}
+                          component="div"
+                          className="text-red-500"
+                        />
 
                         <Field
                           type="number"
@@ -380,7 +487,11 @@ const UpdateProduct = ({ token }) => {
                           name={`variants[${index}].options[${optionIndex}].weight`}
                           className="shadow appearance-none border rounded-md w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
-                        <ErrorMessage name={`variants[${index}].options[${optionIndex}].weight`} component="div" className="text-red-500" />
+                        <ErrorMessage
+                          name={`variants[${index}].options[${optionIndex}].weight`}
+                          component="div"
+                          className="text-red-500"
+                        />
 
                         <Field
                           type="text"
@@ -388,8 +499,11 @@ const UpdateProduct = ({ token }) => {
                           name={`variants[${index}].options[${optionIndex}].sku`}
                           className="shadow appearance-none border rounded-md w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
-                        <ErrorMessage name={`variants[${index}].options[${optionIndex}].sku`} component="div" className="text-red-500" />
-
+                        <ErrorMessage
+                          name={`variants[${index}].options[${optionIndex}].sku`}
+                          component="div"
+                          className="text-red-500"
+                        />
 
                         {/* Remove Option Button */}
                         <button
@@ -397,7 +511,9 @@ const UpdateProduct = ({ token }) => {
                           onClick={() =>
                             setFieldValue(
                               `variants[${index}].options`,
-                              variant.options.filter((_, i) => i !== optionIndex)
+                              variant.options.filter(
+                                (_, i) => i !== optionIndex
+                              )
                             )
                           }
                           className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-3 rounded-md items-center col-span-full sm:col-span-1 md:col-span-1 lg:col-span-1" // Adjust col-span for responsiveness
@@ -441,7 +557,12 @@ const UpdateProduct = ({ token }) => {
                 onClick={() =>
                   setFieldValue("variants", [
                     ...values.variants,
-                    { name: "", options: [{ name: "", stock: 0, price: 0, sku: "", weight: 0 }] },
+                    {
+                      name: "",
+                      options: [
+                        { name: "", stock: 0, price: 0, sku: "", weight: 0 },
+                      ],
+                    },
                   ])
                 }
                 className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md"
@@ -453,13 +574,20 @@ const UpdateProduct = ({ token }) => {
           {/* Bestseller Checkbox */}
           <div className="mb-4">
             <label className="inline-flex items-center">
-              <Field type="checkbox" name="bestseller" className="form-checkbox" />
+              <Field
+                type="checkbox"
+                name="bestseller"
+                className="form-checkbox"
+              />
               <span className="ml-2 text-gray-700">Add to bestseller</span>
             </label>
           </div>
 
           {/* Submit Button */}
-          <button type="submit" className="bg-black text-white px-6 py-2 rounded-md hover:bg-gray-800">
+          <button
+            type="submit"
+            className="bg-black text-white px-6 py-2 rounded-md hover:bg-gray-800"
+          >
             ADD
           </button>
         </Form>
@@ -468,4 +596,4 @@ const UpdateProduct = ({ token }) => {
   );
 };
 
-export default UpdateProduct;
+export default Add;

@@ -2,9 +2,10 @@ import express from "express";
 import {
   addProduct,
   deleteProduct,
+  editProduct,
   getProductById,
   getProducts,
-  updateProduct,
+ 
 } from "../controllers/productController.js";
 import upload from "../middleware/multer.js";
 import adminAuth from "../middleware/adminAuth.js";
@@ -20,6 +21,7 @@ productRouter.post(
     { name: "image3", maxCount: 1 },
     { name: "image4", maxCount: 1 },
   ]),
+  adminAuth,
   (req, res) => { 
     try {
       addProduct(req, res);
@@ -33,7 +35,7 @@ productRouter.post("/delete", adminAuth, deleteProduct);
 productRouter.get("/:Id/get", getProductById);
 productRouter.get("/list", getProducts);
 productRouter.put(
-  "/update/:productId",
+  "/edit/:productId",
   adminAuth,
   upload.fields([
     { name: "image1", maxCount: 1 },
@@ -41,7 +43,7 @@ productRouter.put(
     { name: "image3", maxCount: 1 },
     { name: "image4", maxCount: 1 },
   ]),
-  updateProduct
+  editProduct
 );
 
 export default productRouter;
