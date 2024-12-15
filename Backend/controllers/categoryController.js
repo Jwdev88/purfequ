@@ -2,13 +2,25 @@ import Category from "../models/categoryModel.js";
 import SubCategory from "../models/subCategoryModel.js";
 import { v2 as cloudinary } from "cloudinary";
 
+// Helper function to upload images to Cloudinary
+async function uploadImageToCloudinary(imageFile) {
+  try {
+    const result = await cloudinary.uploader.upload(imageFile.path, {
+      resource_type: "image",
+    });
+    return result.secure_url;
+  } catch (error) {
+    console.error("Cloudinary upload error:", error);
+    throw error;
+  }
+}
+
 // Create a new category
 const createCategory = async (req, res) => {
   try {
     const { name, description, status } = req.body;
     const imageFile = req.file;
 
-    // Validation
     if (!name) {
       return res.status(400).json({
         success: false,
@@ -22,17 +34,14 @@ const createCategory = async (req, res) => {
       });
     }
 
-    // Upload image to Cloudinary
     const imageURI = await uploadImageToCloudinary(imageFile);
 
-    const categoryData = {
+    const newCategory = new Category({
       name,
       description,
       status: status || "active",
       image: imageURI,
-    };
-
-    const newCategory = new Category(categoryData);
+    });
     await newCategory.save();
 
     res.status(201).json({
@@ -41,14 +50,6 @@ const createCategory = async (req, res) => {
     });
   } catch (error) {
     console.error("Error creating category:", error);
-
-    if (error.code === "ENOENT") {
-      return res.status(500).json({
-        success: false,
-        message: `File not found: ${error.path}`,
-      });
-    }
-
     res.status(500).json({
       success: false,
       message: "Failed to create category",
@@ -56,61 +57,42 @@ const createCategory = async (req, res) => {
   }
 };
 
-async function uploadImageToCloudinary(imageFile) {
-  try {
-    const result = await cloudinary.uploader.upload(imageFile.path, {
-      resource_type: "image",
-    });
-    return result.secure_url;
-  } catch (error) {
-    console.error("Cloudinary upload error:", error);
-    throw error; // Re-throw the error to be caught by the outer try-catch block
-  }
-}
 // Get all categories
 const getCategories = async (req, res) => {
   try {
-    // Fetch Categories
     const categories = await Category.find();
     const subCategories = await SubCategory.find().populate("category");
 
-    // Process categories with Cloudinary image data
     const categoriesWithImageData = await Promise.all(
       categories.map(async (category) => {
         let imageData = null;
-
         if (typeof category.image === "string") {
           try {
             const publicId = category.image.split("/").pop().split(".")[0];
             const cloudinaryData = await cloudinary.api.resource(publicId);
-            imageData = cloudinaryData.secure_url; // Ambil URL aman dari Cloudinary
+            imageData = cloudinaryData.secure_url;
           } catch (cloudinaryError) {
             console.error("Cloudinary error:", cloudinaryError);
           }
         }
-
         return {
           _id: category._id,
           name: category.name,
-          image: imageData || category.image, // Fallback jika Cloudinary gagal
+          image: imageData || category.image,
         };
       })
     );
 
-    // Process SubCategories to flatten populated data
     const formattedSubCategories = subCategories.map((subCategory) => ({
       _id: subCategory._id,
       name: subCategory.name,
       description: subCategory.description || null,
       status: subCategory.status,
       categoryId: subCategory.category ? subCategory.category._id : null,
-      categoryName: subCategory.category
-        ? subCategory.category.name
-        : "Unassigned",
+      categoryName: subCategory.category ? subCategory.category.name : "Unassigned",
       image: subCategory.image,
     }));
 
-    // Send Response
     res.status(200).json({
       success: true,
       categories: categoriesWithImageData,
@@ -126,26 +108,20 @@ const getCategories = async (req, res) => {
 };
 
 // Get a single category by ID
-
 const getCategoryById = async (req, res) => {
   try {
     const { id } = req.params;
 
     if (!id) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Category not found" });
+      return res.status(404).json({ success: false, message: "Category not found" });
     }
 
     const category = await Category.findById(id);
 
     if (!category) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Category not found" });
+      return res.status(404).json({ success: false, message: "Category not found" });
     }
 
-    // Fetch image data from Cloudinary (if applicable)
     let imageData = [];
     if (category.image) {
       try {
@@ -154,7 +130,6 @@ const getCategoryById = async (req, res) => {
         imageData = [cloudinaryData];
       } catch (cloudinaryError) {
         console.error("Cloudinary error:", cloudinaryError);
-        // Handle Cloudinary error (e.g., log, return a default image)
       }
     }
 
@@ -167,99 +142,54 @@ const getCategoryById = async (req, res) => {
     });
   } catch (error) {
     if (error.name === "CastError") {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid category ID format" });
+      return res.status(400).json({ success: false, message: "Invalid category ID format" });
     }
     console.error("Error fetching category:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch category" });
+    res.status(500).json({ success: false, message: "Failed to fetch category" });
   }
 };
+
 // Update a category
 const updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description, status } = req.body;
-    const imageFile = req.file; // Get the uploaded image file
+    const imageFile = req.file;
 
     let updatedCategory;
-    if (req.file) {
-      try {
-        const result = await cloudinary.uploader.upload(req.file.path);
-        updatedCategory = await Category.findByIdAndUpdate(
-          id,
-          {
-            name,
-            description,
-            status,
-            image: result.secure_url,
-          },
-          { new: true }
-        );
-      } catch (cloudinaryError) {
-        console.error("Cloudinary upload error:", cloudinaryError);
-        return res.status(500).json({
-          success: false,
-          message: "Failed to upload image to Cloudinary",
-        });
-      }
+    if (imageFile) {
+      const imageURI = await uploadImageToCloudinary(imageFile);
+      updatedCategory = await Category.findByIdAndUpdate(
+        id,
+        { name, description, status, image: imageURI },
+        { new: true }
+      );
     } else {
       updatedCategory = await Category.findByIdAndUpdate(
         id,
-        {
-          name,
-          description,
-          status,
-        },
+        { name, description, status },
         { new: true }
       );
     }
 
     if (!updatedCategory) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Category not found" });
+      return res.status(404).json({ success: false, message: "Category not found" });
     }
+
     let imageData = [];
     if (updatedCategory.image) {
-      if (Array.isArray(updatedCategory.image)) {
-        imageData = await Promise.all(
-          updatedCategory.image.map(async (imageUrl) => {
-            const publicId = imageUrl.split("/").pop().split(".")[0];
-            try {
-              return await cloudinary.api.resource(publicId);
-            } catch (cloudinaryError) {
-              console.error(
-                "Error fetching image data from Cloudinary:",
-                cloudinaryError
-              );
-              // Handle the error gracefully (e.g., log, return a default image)
-              return null;
-            }
-          })
-        );
-      } else if (typeof updatedCategory.image === "string") {
-        // Handle cases where 'image' is a single string (older data format)
-        const publicId = updatedCategory.image.split("/").pop().split(".")[0];
-        try {
-          imageData = [await cloudinary.api.resource(publicId)];
-        } catch (cloudinaryError) {
-          console.error(
-            "Error fetching image data from Cloudinary:",
-            cloudinaryError
-          );
-          // Handle the error gracefully
-          imageData = [];
-        }
+      const publicId = updatedCategory.image.split("/").pop().split(".")[0];
+      try {
+        imageData = [await cloudinary.api.resource(publicId)];
+      } catch (cloudinaryError) {
+        console.error("Error fetching image data from Cloudinary:", cloudinaryError);
+        imageData = [];
       }
     }
-    res
-      .status(200)
-      .json({ success: true, message: "Category updated successfully" });
+
+    res.status(200).json({ success: true, message: "Category updated successfully" });
   } catch (error) {
-    console.log(error);
+    console.error(error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -270,12 +200,11 @@ const deleteCategory = async (req, res) => {
     const { id } = req.params;
     const deletedCategory = await Category.findByIdAndDelete(id);
     if (!deletedCategory) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Category not found" });
+      return res.status(404).json({ success: false, message: "Category not found" });
     }
     res.json({ success: true, message: "Category deleted successfully" });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

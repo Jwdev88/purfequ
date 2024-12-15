@@ -1,71 +1,66 @@
 import mongoose from "mongoose";
 
-const productSchema = new mongoose.Schema({
-  name: { type: String, required: true, maxlength: 255 },
-  description: { type: String, required: true },
-  category: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Category", // Relasi dengan model Category
-    required: true,
-  },
-  subCategory: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "SubCategory", // Relasi dengan model SubCategory
-    required: true,
-  },
-  // brand: { type: String },
-  // shop: {
-  //   type: mongoose.Schema.Types.ObjectId,
-  //   ref: "Shop", // Relasi dengan model Shop (toko)
-  //   required: true,
-  // },
-  price: { type: Number },
-  discount: { type: Number, default: 0 }, // Diskon dalam persen
-  stock: { type: Number },
-  weight: { type: Number }, // Dalam gram
-  // condition: { type: String, enum: ["new", "used"], default: "new" }, // Kondisi produk
-  minOrder: { type: Number, default: 1 }, // Minimum order quantity
-  // preorder: { type: Boolean, default: false }, // Preorder atau tidak
-  // preorderDuration: { type: Number }, // Durasi preorder dalam hari (jika preorder = true)
-  images: [{ type: String, required: true }], // Array of image URLs
-  sku: {
-    type: String,
-    required: true, // SKU wajib diisi
-    unique: true, // Pastikan SKU unik
-    trim: true, // Hilangkan spasi di awal dan akhir
-    uppercase: true, // konversi ke uppercase
-    nullable: false,
-  },
-  variants: [
-    {
-      name: { type: String, required: true }, // Nama varian (misal: "Warna")
-      options: [
-        {
-          name: { type: String, required: true }, // Nama opsi (misal: "Merah")
-          stock: { type: Number, required: true },
-          price: { type: Number, required: true }, // Harga bisa berbeda per varian
-          sku: { type: String,required: true , unique: true}, // SKU untuk varian
-          // image: { type: String }, // Gambar untuk varian
-          weight: { type: Number, required: true }, // Berat dalam gram
-        },
-      ],
+const productSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true, maxlength: 255 },
+    description: { type: String, required: true },
+    category: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Category",
+      required: true,
     },
-  ],
-  bestSeller: { type: Boolean, default: false },
-  rating: { type: Number, default: 5 }, // Rating produk
-  // sold: { type: Number, default: 0 }, // Jumlah produk terjual
-  // views: { type: Number, default: 0 }, // Jumlah views produk
-  // status: { type: String, enum: ["active", "inactive"], default: "active" },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
-});
+    subCategory: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SubCategory",
+      required: true,
+    },
+    price: { type: Number, required: true, min: 0 }, // Price must be non-negative
+    discount: { type: Number, default: 0, min: 0, max: 100 }, // Percent discount
+    stock: { type: Number, required: true, min: 0 }, // Ensure stock is non-negative
+    weight: { type: Number, required: true, min: 0 }, // Weight must be in grams
+    minOrder: { type: Number, default: 1, min: 1 }, // Minimum quantity to order
+    images: [
+      { type: String, required: true, validate: /\bhttps?:\/\/\S+\b/ }, // Validate URL format
+    ],
+    sku: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      uppercase: true,
+    },
+    variants: [
+      {
+        name: { type: String, required: true }, // e.g., "Color"
+        options: [
+          {
+            name: { type: String, required: true }, // e.g., "Red"
+            stock: { type: Number, required: true, min: 0 },
+            price: { type: Number, required: true, min: 0 },
+            sku: { type: String, required: true, unique: true },
+            // image: { type: String, validate: }, // Optional image
+            weight: { type: Number, required: true, min: 0 },
+          },
+        ],
+      },
+    ],
+    bestSeller: { type: Boolean, default: false },
+    rating: { type: Number, default: 5, min: 0, max: 5 }, // Min/max constraints
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
+  },
+  {
+    timestamps: true, // Automatically handles createdAt and updatedAt
+  }
+);
 
+// Automatically update `updatedAt` timestamp
 productSchema.pre("save", function (next) {
   this.updatedAt = Date.now();
   next();
 });
 
-const Product =
-  mongoose.models.product || mongoose.model("product", productSchema);
+// Export the model
+const Product = mongoose.models.product || mongoose.model("product", productSchema);
 
 export default Product;

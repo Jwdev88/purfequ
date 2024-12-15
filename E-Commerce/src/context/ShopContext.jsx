@@ -80,40 +80,71 @@ const ShopContextProvider = (props) => {
 
   //function untuk menambahkan item ke cart
   const addToCart = async (itemId, variantName, variantOption) => {
-    let cartData = structuredClone(cartItems);
-
-    if (cartData[itemId]) {
-      if (cartData[itemId][variantName]) {
-        if (cartData[itemId][variantName][variantOption]) {
-          cartData[itemId][variantName][variantOption] += 1;
-        } else {
-          cartData[itemId][variantName][variantOption] = 1;
-        }
-      } else {
-        cartData[itemId][variantName] = {};
-        cartData[itemId][variantName][variantOption] = 1;
-      }
-    } else {
-      cartData[itemId] = {};
-      cartData[itemId][variantName] = {};
-      cartData[itemId][variantName][variantOption] = 1;
+    if (!token) {
+      toast.error("Please log in to add items to the cart.");
+      return;
     }
-    setCartItems(cartData);
-
-    if (token) {
-      try {
-        await axios.post(
-          backendUrl + "/api/cart/add",
-          { itemId, variantName, variantOption },
-          { headers: { token } }
-        );
+  
+    if (!products.length) {
+      toast.error("Products are not loaded yet. Please try again later.");
+      return;
+    }
+  
+    const product = products.find((p) => p._id === itemId);
+    if (!product) {
+      toast.error("Invalid product selected.");
+      return;
+    }
+  
+    const variant = product.variants?.find((v) => v._id === variantName || v.name === variantName);
+    if (!variant) {
+      toast.error(`Variant "${variantName}" does not exist for this product.`);
+      return;
+    }
+  
+    if (!variantOption) {
+      toast.error(`No option selected for the variant "${variantName}".`);
+      return;
+    }
+  
+    const option = variant.options?.find((o) => o._id === variantOption || o.name === variantOption);
+    if (!option) {
+      toast.error(`Option "${variantOption}" does not exist for the variant "${variantName}".`);
+      return;
+    }
+  
+    // Proceed with adding to cart
+    try {
+      const response = await axios.post(
+        backendUrl + "/api/cart/add",
+        { itemId, variantName, variantOption },
+        { headers: { token } }
+      );
+  
+      if (response.data.success) {
+        let cartData = structuredClone(cartItems);
+        if (cartData[itemId]) {
+          if (cartData[itemId][variantName]) {
+            cartData[itemId][variantName][variantOption] =
+              (cartData[itemId][variantName][variantOption] || 0) + 1;
+          } else {
+            cartData[itemId][variantName] = { [variantOption]: 1 };
+          }
+        } else {
+          cartData[itemId] = { [variantName]: { [variantOption]: 1 } };
+        }
+        setCartItems(cartData);
         toast.success("Item added to cart");
-      } catch (error) {
-        console.log(error);
-        toast.error(error.message);
+      } else {
+        toast.error(response.data.message || "Failed to add item to cart.");
       }
+    } catch (error) {
+      console.error("Error adding to cart:", error.response?.data || error.message);
+      toast.error("An unexpected error occurred. Please try again.");
     }
   };
+  
+
 
   //function untuk menghapus item di cart
   const getCartCount = () => {
@@ -142,9 +173,14 @@ const ShopContextProvider = (props) => {
         for (const variantOption in cartItems[itemId][variantName]) {
           try {
             if (cartItems[itemId][variantName][variantOption] > 0) {
-              const variant = itemInfo.variants.find((v) => v.name === variantName);
-              const option = variant.options.find((o) => o.name === variantOption);
-              totalAmount += option.price * cartItems[itemId][variantName][variantOption];
+              const variant = itemInfo.variants.find(
+                (v) => v.name === variantName
+              );
+              const option = variant.options.find(
+                (o) => o.name === variantOption
+              );
+              totalAmount +=
+                option.price * cartItems[itemId][variantName][variantOption];
             }
           } catch (error) {}
         }
@@ -184,7 +220,12 @@ const ShopContextProvider = (props) => {
     }
   }, []);
 
-  const updateQuanity = async (itemId, variantName, variantOption, quantity) => {
+  const updateQuanity = async (
+    itemId,
+    variantName,
+    variantOption,
+    quantity
+  ) => {
     let cartData = structuredClone(cartItems);
 
     if (cartData[itemId] && cartData[itemId][variantName]) {

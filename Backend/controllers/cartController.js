@@ -1,129 +1,166 @@
 import userModel from "../models/userModel.js";
+import Joi from "joi";
 
-// Mendapatkan cart berdasarkan userId
+// Helper function for standardized error responses
+const handleError = (res, error, message = "An error occurred", status = 500) => {
+  console.error(message, error);
+  res.status(status).json({ success: false, message });
+};
+
+// Validation schema using Joi
+const validateCartInput = (data) => {
+  const schema = Joi.object({
+    userId: Joi.string().required(),
+    productId: Joi.string().optional(),
+    variantId: Joi.string().optional(),
+    quantity: Joi.number().integer().min(1).optional(),
+  });
+  return schema.validate(data);
+};
+
+// Get user's cart by userId
 export const getUserCart = async (req, res) => {
   try {
     const { userId } = req.body;
 
+    // Validate input
+    const { error } = validateCartInput({ userId });
+    if (error) return res.status(400).json({ success: false, message: error.details[0].message });
+
     const user = await userModel.findById(userId).populate("cartData");
 
     if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
+      return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    const cartData = user.cartData;
-    res.json({ success: true, cartData });
+    res.json({ success: true, cartData: user.cartData });
   } catch (error) {
-    console.log(error);
-    res.json({ success: false, message: error.message });
+    handleError(res, error, "Failed to fetch user cart");
   }
 };
 
-// Menambahkan item ke cart
-
-export const addToCart = async (userId, productId, variantId, quantity) => {
+// Add an item to the cart
+export const addToCart = async (req, res) => {
   try {
+    const { userId, productId, variantId, quantity = 1 } = req.body;
+
+    // Validate input
+    const { error } = validateCartInput({ userId, productId, variantId, quantity });
+    if (error) return res.status(400).json({ success: false, message: error.details[0].message });
+
     const user = await userModel.findById(userId);
 
-    // Periksa apakah varian produk ada dalam keranjang
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // Check if the product variant already exists in the cart
     const existingItem = user.cartData.find(
       (item) =>
         item.productId.equals(productId) && item.variantId.equals(variantId)
     );
-    // Improved check and update with optional chaining and default values
-    cartData[itemId] = cartData[itemId] || {}; // Create empty object for itemId if not present
-    cartData[itemId][variantName] = cartData[itemId][variantName] || {}; // Create empty object for variantName if not present
 
-    cartData[itemId][variantName][variantOption] =
-      (cartData[itemId][variantName][variantOption] || 0) + 1;
     if (existingItem) {
-      existingItem.quantity += quantity; // Tambahkan jumlah ke item yang ada
+      existingItem.quantity += quantity; // Update quantity for existing item
     } else {
-      user.cartData.push({ productId, variantId, quantity }); // Tambahkan item baru ke keranjang
+      // Add new item to the cart
+      user.cartData.push({ productId, variantId, quantity });
     }
-    await user.save();
 
-    return user; // Kembalikan pengguna yang diperbarui
+    await user.save();
+    res.json({ success: true, message: "Item added to cart", cartData: user.cartData });
   } catch (error) {
-    console.error(error);
-    throw error; // Tangani kesalahan
+    handleError(res, error, "Failed to add item to cart");
   }
 };
 
-// Mengupdate quantity item di cart
+// Update quantity of a cart item
 export const updateCart = async (req, res) => {
   try {
     const { userId, productId, variantId, quantity } = req.body;
+
+    // Validate input
+    const { error } = validateCartInput({ userId, productId, variantId, quantity });
+    if (error) return res.status(400).json({ success: false, message: error.details[0].message });
+
     const user = await userModel.findById(userId);
 
     if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
+      return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    const item = user.cart.find(
+    const item = user.cartData.find(
       (item) =>
         item.productId.equals(productId) && item.variantId.equals(variantId)
     );
 
-    if (item) {
-      item.quantity = quantity;
-    } else {
-      return res
-        .status(404)
-        .json({ success: false, message: "Item not found in cart" });
+    if (!item) {
+      return res.status(404).json({ success: false, message: "Item not found in cart" });
     }
 
+    item.quantity = quantity; // Update quantity
     await user.save();
-    res.json({ success: true, message: "Cart updated successfully" });
+
+    res.json({ success: true, message: "Cart updated successfully", cartData: user.cartData });
   } catch (error) {
-    console.error("Error updating cart:", error);
-    res.status(500).json({ success: false, message: "Failed to update cart" });
+    handleError(res, error, "Failed to update cart");
   }
 };
-export const removeFromCart = async (userId, productId, variantId) => {
+
+// Remove an item from the cart
+export const removeFromCart = async (req, res) => {
   try {
+    const { userId, productId, variantId } = req.body;
+
+    // Validate input
+    const { error } = validateCartInput({ userId, productId, variantId });
+    if (error) return res.status(400).json({ success: false, message: error.details[0].message });
+
     const user = await userModel.findById(userId);
 
     if (!user) {
-      throw new Error("User not found");
+      return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    user.cart = user.cart.filter(
+    // Filter out the item to be removed
+    user.cartData = user.cartData.filter(
       (item) =>
-        !item.productId.equals(productId) || !item.variantId.equals(variantId)
+        !(item.productId.equals(productId) && item.variantId.equals(variantId))
     );
 
     await user.save();
-
-    return user; // Return updated user
+    res.json({ success: true, message: "Item removed from cart", cartData: user.cartData });
   } catch (error) {
-    console.error("Error removing from cart:", error);
-    throw error; // Handle error
+    handleError(res, error, "Failed to remove item from cart");
   }
 };
 
-// Menghapus item di cart
+// Clear the user's cart
 export const clearCart = async (req, res) => {
   try {
-    const userId = req.user._id; // Asumsikan Anda menggunakan middleware authentication
+    const { userId } = req.body;
 
-    await userModel.findByIdAndUpdate(userId, { cartData: {} });
+    // Validate input
+    const { error } = validateCartInput({ userId });
+    if (error) return res.status(400).json({ success: false, message: error.details[0].message });
 
-    res.json({ success: true, message: "Cart cleared successfully" });
+    const user = await userModel.findByIdAndUpdate(userId, { cartData: [] }, { new: true });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    res.json({ success: true, message: "Cart cleared successfully", cartData: user.cartData });
   } catch (error) {
-    console.error("Error clearing cart:", error);
-    res.status(500).json({ success: false, message: "Failed to clear cart" });
+    handleError(res, error, "Failed to clear cart");
   }
 };
 
+// Export all handlers
 export default {
   getUserCart,
   addToCart,
   updateCart,
   removeFromCart,
-  // clearCart
+  clearCart,
 };

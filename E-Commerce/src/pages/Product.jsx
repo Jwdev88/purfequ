@@ -77,44 +77,78 @@ const Product = () => {
     );
   }
 
+ 
+ 
+  const getSelectedVariantId = () => {
+    const matchingVariant = productData.variants.find((variant) => {
+      const selectedOptionName = selectedVariants[variant.name];
+      return selectedOptionName && variant.options.some((option) => option.name === selectedOptionName);
+    });
+  
+    if (!matchingVariant) {
+      toast.error("Please select valid options for all variants.");
+    }
+  
+    return matchingVariant?._id;
+  };
+  
   const handleAddToCart = () => {
     if (
       productData?.variants?.length > 0 &&
       Object.keys(selectedVariants).length !== productData.variants.length
     ) {
       toast.error("Silahkan pilih semua varian.");
-    } else {
-      const selectedVariantId = getSelectedVariantId(); // New function to get variant ID
-      addToCart(productData._id, selectedVariantId); // Pass the variant ID
-      toast.success(`"${productData.name}" telah ditambahkan ke keranjang`);
-    }
-  };
-
-  const getSelectedVariantId = () => {
-    if (!productData?.variants || productData.variants.length === 0) {
-      return productData._id; // No variants, add the entire product
+      return;
     }
   
-    // Find the variant matching the selected options
-    const matchingVariant = productData.variants.find((variant) => {
-      return Object.entries(selectedVariants).every(([variantName, selectedOption]) => {
-        return variant.name === variantName && variant.options.some((option) => option.name === selectedOption);
-      });
-    });
+    const selectedVariantId = getSelectedVariantId();
+    if (!selectedVariantId) {
+      toast.error("Please select valid options for all variants.");
+      return;
+    }
   
-    return matchingVariant?._id; // Return the ID of the matching variant or undefined if not found
+    addToCart(productData._id, selectedVariantId);
+    toast.success(`"${productData.name}" telah ditambahkan ke keranjang`);
   };
+  
 
-  const handleVariantChange = (variantName, option) => {
-    setSelectedVariants({ ...selectedVariants, [variantName]: option });
+
+
+  const handleVariantChange = (variantName, selectedOptionName) => {
+    setSelectedVariants({ ...selectedVariants, [variantName]: selectedOptionName });
+    
     const selectedVariant = productData.variants.find(
       (variant) => variant.name === variantName
     );
-    const selectedOption = selectedVariant.options.find(
-      (option) => option.name === option
+    const selectedOption = selectedVariant?.options.find(
+      (option) => option.name === selectedOptionName
     );
-    setImage(selectedOption.image);
+  
+    if (selectedOption?.image) {
+      setImage(selectedOption.image);
+    }
   };
+  
+
+
+ 
+
+        
+            
+  
+    
+   
+  
+
+   
+   
+  
+  
+   
+   
+   
+  
+
 
   return (
     <div className="border-t-2 pt-10 transition-opacity ease-in duration-500 opacity-100">
@@ -225,3 +259,4 @@ const Product = () => {
 };
 
 export default Product;
+

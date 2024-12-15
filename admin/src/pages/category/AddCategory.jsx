@@ -1,4 +1,4 @@
-// AddCategoryForm.js (Frontend - React)
+
 
 import React, { useState } from 'react';
 import axios from 'axios';
@@ -28,7 +28,7 @@ const AddCategoryForm = () => {
       formData.append('name', name);
       formData.append('image', image); // Append the file
       formData.append('description', description);
-      formData.append('status', status);
+      formData.append('status', status ? 'active' : 'inactive');
 
       const response = await axios.post(backendURI + '/api/category/add', formData, {
         headers: {
@@ -95,8 +95,8 @@ const AddCategoryForm = () => {
         <select 
           id="status" 
           className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" 
-          value={status} 
-          onChange={(e) => setStatus(e.target.value)}
+          value={status ? 'active' : 'inactive'} 
+          onChange={(e) => setStatus(e.target.value === 'active')}
         >
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>

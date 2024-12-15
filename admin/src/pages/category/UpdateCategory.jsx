@@ -18,12 +18,15 @@ const UpdateCategory = ({ token }) => {
   const initialValues = {
     name: "",
     description: "",
-    status: "active",
+    status: "",
+    image: null,
   };
 
   const validationSchema = Yup.object().shape({
     name: Yup.string().required("Nama Category wajib diisi"),
     description: Yup.string().required("Description Category wajib diisi"),
+    status: Yup.string().required("Status Category wajib diisi"),
+    image: Yup.mixed().test("fileSize", "Ukuran gambar tidak boleh lebih dari 2 MB", (value) => !value || value.size <= 2 * 1024 * 1024),
   });
 
   const formik = useFormik({
@@ -36,8 +39,8 @@ const UpdateCategory = ({ token }) => {
         formData.append("name", values.name);
         formData.append("description", values.description);
         formData.append("status", values.status);
-        if (image) {
-          formData.append("image", image);
+        if (values.image) {
+          formData.append("image", values.image);
         }
 
         const response = await axios.put(
@@ -61,7 +64,6 @@ const UpdateCategory = ({ token }) => {
       }
     },
   });
-
 
   const handleImageChange = (e) => {
     const selectedImage = e.target.files[0];
@@ -104,13 +106,14 @@ const UpdateCategory = ({ token }) => {
         }
 
         const categoryData = response.data.category;
-        
+
         setInitialImage(categoryData.imageData[0].secure_urls);
 
         formik.setValues({
           name: categoryData.name || "",
           description: categoryData.description || "",
           status: categoryData.status || "active",
+          image: null,
         });
       } catch (err) {
         const errorMessage =
@@ -209,11 +212,19 @@ const UpdateCategory = ({ token }) => {
           id="status"
           value={formik.values.status}
           onChange={formik.handleChange}
-          className="w-full p-2 border border-gray-300 rounded"
+          onBlur={formik.handleBlur}
+          className={`w-full p-2 border border-gray-300 rounded ${
+            formik.touched.status && formik.errors.status
+              ? "border-red-500"
+              : ""
+          }`}
         >
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
         </select>
+        {formik.touched.status && formik.errors.status && (
+          <div className="text-red-500">{formik.errors.status}</div>
+        )}
       </div>
 
       <button
@@ -228,3 +239,4 @@ const UpdateCategory = ({ token }) => {
 };
 
 export default UpdateCategory;
+

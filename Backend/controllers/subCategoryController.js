@@ -1,45 +1,38 @@
 import SubCategory from "../models/subCategoryModel.js";
 import { v2 as cloudinary } from "cloudinary";
-
 import mongoose from "mongoose";
+
 const addSubCategory = async (req, res) => {
   try {
     const { name, description, status, category } = req.body;
     const file = req.file;
+
     if (!file) {
-      return res
-        .status(400)
-        .json({ success: false, message: "File gambar tidak ditemukan." });
+      return res.status(400).json({ success: false, message: "File gambar tidak ditemukan." });
     }
 
     if (!category) {
-      return res.status(400).json({
-        success: false,
-        message: "Category ID is required",
-      });
+      return res.status(400).json({ success: false, message: "Category ID is required" });
     }
-    
-    console.log("Request body:", req.body);
-    console.log("Uploaded file:", req.file);
-    const result = await cloudinary.uploader.upload(req.file.path);
+
+    const imageUrl = await uploadImageToCloudinary(file);
+
     const newSubCategory = new SubCategory({
       name,
       description,
       status,
-      category: category,
-      image: result.secure_url,
+      category,
+      image: imageUrl,
     });
 
-
     await newSubCategory.save();
-    res
-      .status(200)
-      .json({ success: true, message: "Subcategory created successfully" });
+    res.status(200).json({ success: true, message: "Subcategory created successfully" });
   } catch (error) {
-    console.log(error);
+    console.error(error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
 async function uploadImageToCloudinary(imageFile) {
   try {
     const result = await cloudinary.uploader.upload(imageFile.path, {
@@ -48,15 +41,15 @@ async function uploadImageToCloudinary(imageFile) {
     return result.secure_url;
   } catch (error) {
     console.error("Cloudinary upload error:", error);
-    throw error; // Re-throw the error to be caught by the outer try-catch block
+    throw error;
   }
 }
+
 const getSubCategories = async (req, res) => {
   try {
-    const categoryId = req.query.category; // Get category ID from query parameter
-    const subCategories = await SubCategory.find(categoryId).populate(
-      "category"
-    );
+    const categoryId = req.query.category;
+    const subCategories = await SubCategory.find({ category: categoryId }).populate("category");
+
     const subCategoriesWithImageData = await Promise.all(
       subCategories.map(async (subCategory) => {
         let imageData = [];
@@ -64,24 +57,21 @@ const getSubCategories = async (req, res) => {
           const publicId = subCategory.image.split("/").pop().split(".")[0];
           try {
             const cloudinaryData = await cloudinary.api.resource(publicId);
-            imageData = [cloudinaryData]; // Store the image data in an array
+            imageData = [cloudinaryData];
           } catch (cloudinaryError) {
             console.error("Cloudinary error:", cloudinaryError);
-            imageData = []; // Handle errors by setting imageData to an empty array
+            imageData = [];
           }
-        } else {
         }
 
         return {
           ...subCategory.toObject(),
-          imageData: imageData,
+          imageData,
         };
       })
     );
-    res.status(200).json({
-      success: true,
-      subCategories: subCategoriesWithImageData,
-    });
+
+    res.status(200).json({ success: true, subCategories: subCategoriesWithImageData });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: error.message });
@@ -93,21 +83,16 @@ const getSubCategoryById = async (req, res) => {
     const { id } = req.params;
 
     if (!id) {
-      return res
-        .status(400)
-        .json({ success: false, message: "SubCategory ID is required" });
+      return res.status(400).json({ success: false, message: "SubCategory ID is required" });
     }
 
     const subcategory = await SubCategory.findById(id).populate("category");
 
     if (!subcategory) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Subcategory not found" });
+      return res.status(404).json({ success: false, message: "Subcategory not found" });
     }
 
     let imageData = [];
-
     if (subcategory.image) {
       try {
         const publicId = subcategory.image.split("/").pop().split(".")[0];
@@ -115,7 +100,7 @@ const getSubCategoryById = async (req, res) => {
         imageData = [cloudinaryData];
       } catch (cloudinaryError) {
         console.error("Cloudinary error:", cloudinaryError);
-        imageData = [{ secure_url: "/path/to/default/image.jpg" }]; // Use a default image URL
+        imageData = [{ secure_url: "/path/to/default/image.jpg" }];
       }
     }
 
@@ -123,113 +108,58 @@ const getSubCategoryById = async (req, res) => {
       success: true,
       subcategory: {
         ...subcategory.toObject(),
-        imageData: imageData,
+        imageData,
       },
     });
   } catch (error) {
     if (error.name === "CastError") {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid Subcategory ID format" });
+      return res.status(400).json({ success: false, message: "Invalid Subcategory ID format" });
     }
     console.error("Error getting subcategory by ID:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch subcategory",
-      error: error.message,
-    });
+    res.status(500).json({ success: false, message: "Failed to fetch subcategory", error: error.message });
   }
 };
+
 const updateSubCategory = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description, status } = req.body;
     const file = req.file;
-    if (!file) {
-      return res
-        .status(400)
-        .json({ success: false, message: "File gambar tidak ditemukan." });
-    }
 
-    let updatedsubCategory;
-    if (req.file) {
-      try {
-        const result = await cloudinary.uploader.upload(req.file.path);
-        updatedsubCategory = await SubCategory.findByIdAndUpdate(
-          id,
-          {
-            name,
-            description,
-            status,
-            image: result.secure_url,
-          },
-          { new: true }
-        );
-      } catch (cloudinaryError) {
-        console.error("Cloudinary upload error:", cloudinaryError);
-        return res.status(500).json({
-          success: false,
-          message: "Failed to upload image to Cloudinary",
-        });
-      }
-    } else {
-      updatedsubCategory = await SubCategory.findByIdAndUpdate(
+    let updatedSubCategory;
+    if (file) {
+      const imageUrl = await uploadImageToCloudinary(file);
+      updatedSubCategory = await SubCategory.findByIdAndUpdate(
         id,
-        {
-          name,
-          description,
-          status,
-        },
+        { name, description, status, image: imageUrl },
+        { new: true }
+      );
+    } else {
+      updatedSubCategory = await SubCategory.findByIdAndUpdate(
+        id,
+        { name, description, status },
         { new: true }
       );
     }
 
-    if (!updatedsubCategory) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Subcategory not found" });
+    if (!updatedSubCategory) {
+      return res.status(404).json({ success: false, message: "Subcategory not found" });
     }
+
     let imageData = [];
-    if (updatedsubCategory.image) {
-      if (Array.isArray(updatedsubCategory.image)) {
-        imageData = await Promise.all(
-          updatedsubCategory.image.map(async (imageUrl) => {
-            const publicId = imageUrl.split("/").pop().split(".")[0];
-            try {
-              return await cloudinary.api.resource(publicId);
-            } catch (cloudinaryError) {
-              console.error(
-                "Error fetching image data from Cloudinary:",
-                cloudinaryError
-              );
-              // Handle the error gracefully (e.g., log, return a default image)
-              return null;
-            }
-          })
-        );
-      } else if (typeof updatedsubCategory.image === "string") {
-        // Handle cases where 'image' is a single string (older data format)
-        const publicId = updatedsubCategory.image
-          .split("/")
-          .pop()
-          .split(".")[0];
-        try {
-          imageData = [await cloudinary.api.resource(publicId)];
-        } catch (cloudinaryError) {
-          console.error(
-            "Error fetching image data from Cloudinary:",
-            cloudinaryError
-          );
-          // Handle the error gracefully
-          imageData = [];
-        }
+    if (updatedSubCategory.image) {
+      const publicId = updatedSubCategory.image.split("/").pop().split(".")[0];
+      try {
+        imageData = [await cloudinary.api.resource(publicId)];
+      } catch (cloudinaryError) {
+        console.error("Error fetching image data from Cloudinary:", cloudinaryError);
+        imageData = [];
       }
     }
-    res
-      .status(200)
-      .json({ success: true, message: "Subcategory updated successfully" });
+
+    res.status(200).json({ success: true, message: "Subcategory updated successfully" });
   } catch (error) {
-    console.log(error);
+    console.error(error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -238,15 +168,11 @@ const deleteSubCategory = async (req, res) => {
   try {
     const subCategory = await SubCategory.findByIdAndDelete(req.params.id);
     if (!subCategory) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Subcategory not found" });
+      return res.status(404).json({ success: false, message: "Subcategory not found" });
     }
-    res
-      .status(200)
-      .json({ success: true, message: "Subcategory deleted successfully" });
+    res.status(200).json({ success: true, message: "Subcategory deleted successfully" });
   } catch (error) {
-    console.log(error);
+    console.error(error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

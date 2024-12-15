@@ -18,9 +18,10 @@ import CategoryList from "./pages/category/ListCategory";
 import UpdateCategory from "./pages/category/UpdateCategory";
 
 // SubCategory
-import AddSubCategory from "./pages/subCategory/AddSubCategory";
+import AddSubCategoryForm from "./pages/subCategory/AddsubCategory"
 import ListSubCategory from "./pages/subCategory/ListSubCategory";
 import UpdateSubCategory from "./pages/subCategory/UpdatesubCategory";
+
 
 
 
@@ -62,7 +63,7 @@ const App = () => {
                 </Route>
 
                 <Route path="/subcategory">
-                  <Route path="add" element={<AddSubCategory token={token} />} />
+                  <Route path="add" element={<AddSubCategoryForm token={token} />} />
                   <Route path="list" element={<ListSubCategory token={token} />} />
                   <Route path="edit/:subcategoryId" element={<UpdateSubCategory token={token} />} />
                 </Route>
