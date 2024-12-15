@@ -14,24 +14,24 @@ const ListsubCategory = () => {
   const [sortStatus, setSortStatus] = useState("");
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchSubCategories = async () => {
-      setIsLoading(true);
-      try {
-        const response = await axios.get(`${backendURI}/api/subcategory/list`);
-        if (response.data.success) {
-          setSubCategories(response.data.subCategories);
-        } else {
-          toast.error(response.data.message || "Failed to fetch subcategories");
-        }
-      } catch (error) {
-        console.error("Error fetching subcategories:", error);
-        toast.error("An error occurred while fetching subcategories");
-      } finally {
-        setIsLoading(false);
+  const fetchSubCategories = async () => {
+    setIsLoading(true);
+    try {
+      const response = await axios.get(`${backendURI}/api/subcategory/list`);
+      if (response.data.success) {
+        setSubCategories(response.data.subCategories);
+      } else {
+        toast.error(response.data.message || "Failed to fetch subcategories");
       }
-    };
+    } catch (error) {
+      console.error("Error fetching subcategories:", error);
+      toast.error("An error occurred while fetching subcategories");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchSubCategories();
   }, []);
 
@@ -43,7 +43,9 @@ const ListsubCategory = () => {
         );
         if (response.data.success) {
           toast.success("Subcategory deleted successfully!");
-          setSubCategories(subcategories.filter((subcategory) => subcategory._id !== id));
+          setSubCategories(
+            subcategories.filter((subcategory) => subcategory._id !== id)
+          );
         } else {
           toast.error(response.data.message || "Failed to delete subcategory");
         }

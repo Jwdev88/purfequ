@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Formik, Form, Field, ErrorMessage } from "formik";
+import { Formik, Form, Field, ErrorMessage, FieldArray } from "formik";
 import * as Yup from "yup";
 import { assets } from "../../assets/assets";
 import axios from "axios";
@@ -8,14 +8,15 @@ import { toast } from "react-toastify";
 import { useParams, useNavigate } from "react-router-dom";
 
 const UpdateProduct = ({ token }) => {
-  const { productId } = useParams(); // Get product ID from URL
-  const navigate = useNavigate(); // For redirection after successful update
-  const [selectedCategory, setSelectedCategory] = useState("");
+  const { productId } = useParams();
+  const navigate = useNavigate();
+
+  // State Management
   const [categories, setCategories] = useState([]);
   const [subCategories, setSubCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
   const [initialValues, setInitialValues] = useState({
-    // Define initialValues here
     image1: null,
     image2: null,
     image3: null,
@@ -28,37 +29,33 @@ const UpdateProduct = ({ token }) => {
     weight: 0,
     category: "",
     subCategory: "",
-    bestseller: false,
-    variants: [],
+    bestSeller: false,
+    variants: [], // Variants structure: [{ name: '', options: [{ name: '', stock: 0, price: 0, weight: 0, sku: '' }] }]
   });
 
+  // Fetch Product Details
   useEffect(() => {
     const fetchProductDetails = async () => {
       try {
         const response = await axios.get(
-          `${backendURI}/api/product/${productId}/get`, // Updated endpoint
+          `${backendURI}/api/product/${productId}/get`,
           {
             headers: { token },
           }
         );
+
         if (response.data.success) {
           const productData = response.data.product;
           setInitialValues({
             ...productData,
-            // Need to adjust the structure to match the form fields
-            category: productData.category._id,
-            subCategory: productData.subCategory._id,
+            category: productData.category?._id || "",
+            subCategory: productData.subCategory?._id || "",
           });
-          setSelectedCategory(productData.category._id);
-          console.log(productData);
-
-          
         } else {
-          toast.error("Failed to fetch product details");
+          toast.error("Failed to fetch product details.");
         }
       } catch (error) {
-        console.error("Error fetching product details:", error);
-        toast.error("Error fetching product details");
+        toast.error("An error occurred while fetching product details.");
       } finally {
         setIsLoading(false);
       }
@@ -67,91 +64,213 @@ const UpdateProduct = ({ token }) => {
     fetchProductDetails();
   }, [productId, token]);
 
-
+  // Fetch Categories
   useEffect(() => {
     const fetchCategories = async () => {
-      setIsLoading(true);
       try {
-        const response = await axios.get(backendURI + "/api/category/list", {
+        const response = await axios.get(`${backendURI}/api/category/list`, {
           headers: { token },
         });
-        setCategories(response.data.categories);
+        setCategories(response.data.categories || []);
       } catch (error) {
-        console.error("Error fetching categories:", error);
-        toast.error("Gagal mengambil data Category");
-      } finally {
-        setIsLoading(false);
+        toast.error("Failed to fetch categories.");
       }
     };
 
     fetchCategories();
   }, [token]);
 
+  // Fetch Subcategories
   useEffect(() => {
     const fetchSubCategories = async () => {
-      if (selectedCategory) {
-        try {
-          const response = await axios.get(
-            `${backendURI}/api/subcategory/list?category=${selectedCategory}`,
-            { headers: { token } }
-          );
-          setSubCategories(response.data.subCategories);
-        } catch (error) {
-          console.error("Error fetching subcategories:", error);
-          toast.error("Gagal mengambil data subCategory");
-        }
-      } else {
-        // Clear subCategories when no category is selected
+      if (!initialValues.category) {
         setSubCategories([]);
+        return;
+      }
+
+      try {
+        const response = await axios.get(
+          `${backendURI}/api/subcategory/list?category=${initialValues.category}`,
+          { headers: { token } }
+        );
+        setSubCategories(response.data.subCategories || []);
+      } catch (error) {
+        toast.error("Failed to fetch subcategories.");
       }
     };
 
     fetchSubCategories();
-  }, [selectedCategory, token]);
+  }, [initialValues.category, token]);
 
+  // Validation Schema
   const validationSchema = Yup.object().shape({
-    name: Yup.string().required("Nama wajib diisi"),
-    description: Yup.string().required("Deskripsi wajib diisi"),
-    category: Yup.string().required("Kategori wajib diisi"),
-    subCategory: Yup.string().required("Subkategori wajib diisi"),
-    // ... other validations ...
+    name: Yup.string().required("Product name is required."),
+    description: Yup.string().required("Product description is required."),
+    category: Yup.string().required("Category is required."),
+    subCategory: Yup.string().required("Subcategory is required."),
+    sku: Yup.string().required("SKU is required."),
+    price: Yup.number()
+      .required("Price is required.")
+      .min(0, "Price must be greater than 0."),
+    stock: Yup.number()
+      .required("Stock is required.")
+      .integer()
+      .min(0, "Stock must be at least 0."),
+    weight: Yup.number()
+      .required("Weight is required.")
+      .min(0, "Weight must be greater than 0."),
   });
-
+  // Form Submission Handler
   const onSubmitHandler = async (values) => {
+    setIsLoading(true);
     try {
       const formData = new FormData();
+      let totalStock = 0;
 
-      // Append product ID to formData
-      formData.append("productId", productId);
+      // Log for debugging
+      console.log("Data values before FormData:", values);
 
-      for (let key in values) {
+      // Handle variants data
+      if (
+        values.variants &&
+        Array.isArray(values.variants) &&
+        values.variants.length > 0
+      ) {
+        // Convert variants array to string to preserve structure
+        formData.append(
+          "variants",
+          JSON.stringify(
+            values.variants.map((variant) => ({
+              name: variant.name,
+              options: variant.options.map((option) => ({
+                name: option.name,
+                stock: Number(option.stock),
+                price: Number(option.price),
+                sku: option.sku,
+                weight: Number(option.weight),
+              })),
+            }))
+          )
+        );
+
+        // Calculate total stock from variants
+        totalStock = values.variants.reduce((total, variant) => {
+          return (
+            total +
+            variant.options.reduce((variantTotal, option) => {
+              return variantTotal + (Number(option.stock) || 0);
+            }, 0)
+          );
+        }, 0);
+      } else {
+        // If no variants, create a default variant structure
+        const defaultVariant = [
+          {
+            name: "Default",
+            options: [
+              {
+                name: "Standard",
+                stock: values.stock,
+                price: values.price,
+                sku: values.sku,
+                weight: values.weight,
+              },
+            ],
+          },
+        ];
+        formData.append("variants", JSON.stringify(defaultVariant));
+        totalStock = values.stock;
+      }
+
+      // Handle other non-variant fields
+      formData.append("stock", totalStock);
+      formData.append("name", values.name);
+      formData.append("description", values.description);
+      formData.append("price", values.price);
+      formData.append("weight", values.weight);
+      formData.append("category", values.category);
+      formData.append("subCategory", values.subCategory);
+      formData.append("bestSeller", values.bestSeller);
+      formData.append("sku", values.sku);
+
+      // Handle images
+      for (const key in values) {
         if (key.startsWith("image") && values[key]) {
-          formData.append(key, values[key]);
-        } else if (key === "variants") {
-          formData.append(key, JSON.stringify(values.variants));
-        } else {
           formData.append(key, values[key]);
         }
       }
-
       const response = await axios.put(
-        `${backendURI}/api/product/edit/${productId}`, // Use update endpoint with product ID
+        `${backendURI}/api/product/edit/${productId}`,
         formData,
-        { headers: { token } }
+        {
+          headers: { token },
+        }
       );
 
       if (response.data.success) {
-        toast.success(response.data.message);
-        // Redirect to product list after successful update
+        toast.success("Product updated successfully!");
         navigate("/product/list");
       } else {
         toast.error(response.data.message);
       }
     } catch (error) {
-      console.error(error);
-      toast.error(error.message);
+      toast.error("An error occurred while updating the product.");
     }
+    setIsLoading(false);
   };
+  const renderField = (
+    label,
+    name,
+    type = "text",
+    as = null,
+    placeholder = ""
+  ) => (
+    <div className="w-full">
+      <label htmlFor={name} className="block mb-2 font-semibold">
+        {label}
+      </label>
+      <Field
+        name={name}
+        type={type}
+        as={as}
+        placeholder={placeholder}
+        className="w-full max-w-[600px] px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+
+      <ErrorMessage
+        name={name}
+        component="div"
+        className="text-red-500 text-sm mt-1"
+      />
+    </div>
+  );
+  const renderVariantField = (
+    label,
+    name,
+    type = "text",
+    as = null,
+    placeholder = "",
+    disabled
+  ) => (
+    <div className="w-full">
+      <label htmlFor={name} className="block mb-2 font-semibold">
+        {label}
+      </label>
+      <Field
+        name={name}
+        type={type}
+        as={as}
+        placeholder={placeholder}
+        disabled={disabled}
+        className="w-full max-w-[600px] px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+      <ErrorMessage
+        name={name}
+        component="div"
+        className="text-red-500 text-sm mt-1"
+      />
+    </div>
+  );
 
   return (
     <Formik
@@ -167,10 +286,18 @@ const UpdateProduct = ({ token }) => {
             <p className="mb-2 text-lg font-semibold">Upload Images</p>
             <div className="flex gap-4">
               {["image1", "image2", "image3", "image4"].map((imageKey) => (
-                <label htmlFor={imageKey} key={imageKey} className="cursor-pointer">
+                <label
+                  htmlFor={imageKey}
+                  key={imageKey}
+                  className="cursor-pointer"
+                >
                   <img
                     className="w-24 h-24 object-cover border-2 border-dashed border-gray-300 rounded-md"
-                    src={!values[imageKey] ? assets.upload_area : URL.createObjectURL(values[imageKey])}
+                    src={
+                      !values[imageKey]
+                        ? assets.upload_area
+                        : URL.createObjectURL(values[imageKey])
+                    }
                     alt={`Placeholder for ${imageKey} upload area`}
                   />
                   <input
@@ -185,30 +312,22 @@ const UpdateProduct = ({ token }) => {
           </div>
 
           {/* Product Name */}
-          <div className="w-full">
-            <p className="mb-2 text-lg font-semibold">Product Name</p>
-            <Field
-              name="name"
-              className="w-full max-w-[600px] px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Type Here"
-              type="text"
-            
-            />
-            <ErrorMessage name="name" component="div" className="text-red-500" />
-          </div>
+          {renderField(
+            "Product Name",
+            "name",
+            "text",
+            "",
+            "Enter product name"
+          )}
 
           {/* Product Description */}
-          <div className="w-full">
-            <p className="mb-2 text-lg font-semibold">Product Description</p>
-            <Field
-              as="textarea"
-              name="description"
-              className="w-full max-w-[600px] px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Type content here"
-            />
-            <ErrorMessage name="description" component="div" className="text-red-500" />
-          </div>
-
+          {renderField(
+            "Product Description",
+            "description",
+            "textarea h-100",
+            "",
+            "Enter product description"
+          )}
 
           {isLoading ? (
             <div>Loading categories and subcategories...</div>
@@ -216,7 +335,10 @@ const UpdateProduct = ({ token }) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-auto">
               {/* Category select */}
               <div className="mb-6">
-                <label htmlFor="category" className="block text-gray-700 text-sm font-semibold mb-2">
+                <label
+                  htmlFor="category"
+                  className="block text-gray-700 text-sm font-semibold mb-2"
+                >
                   Product Category
                 </label>
                 <Field
@@ -225,25 +347,33 @@ const UpdateProduct = ({ token }) => {
                   id="category"
                   onChange={(e) => {
                     setFieldValue("category", e.target.value); // Update Formik's 'category'
-                    setSelectedCategory(e.target.value);   // Update 'selectedCategory' state
+                    setFieldValue("subCategory", ""); // Reset subcategory on category change
+                    
                   }}
                   className="shadow appearance-none border rounded-md py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 w-60"
                 >
-
-                  <option value="">Select a Category</option> Added a default option
+                  <option value="">Select a Category</option> Added a default
+                  option
                   {categories.map((category) => (
                     <option key={category._id} value={category._id}>
-
-                      {category.name.toUpperCase()} {/* Access the name property */}
+                      {category.name.toUpperCase()}{" "}
+                      {/* Access the name property */}
                     </option>
                   ))}
                 </Field>
-                <ErrorMessage name="category" component="div" className="text-red-500" />
+                <ErrorMessage
+                  name="category"
+                  component="div"
+                  className="text-red-500"
+                />
               </div>
 
               {/* Subcategory select */}
               <div className="mb-6">
-                <label htmlFor="subCategory" className="block text-gray-700 text-sm font-semibold mb-2">
+                <label
+                  htmlFor="subCategory"
+                  className="block text-gray-700 text-sm font-semibold mb-2"
+                >
                   Product Subcategory
                 </label>
                 <Field
@@ -259,208 +389,142 @@ const UpdateProduct = ({ token }) => {
                     </option>
                   ))}
                 </Field>
-                <ErrorMessage name="subCategory" component="div" className="text-red-500" />
+                <ErrorMessage
+                  name="subCategory"
+                  component="div"
+                  className="text-red-500"
+                />
               </div>
-
             </div>
           )}
 
-          {/* Conditional fields */}
+          {/* Product Details : Price, Sku, Stock, Weight */}
           {values.variants.length === 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-auto">
-              {/* Product SKU */}
-              <div className="w-full">
-                <p className="mb-2 text-lg font-semibold">Product SKU</p>
-                <Field
-                  name="sku"
-                  className="w-full max-w-[600px] px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Type Here"
-                  type="text"
-                />
-                <ErrorMessage name="sku" component="div" className="text-red-500" />
-              </div>
-
-              {/* Product Stock */}
-              <div className="w-full">
-                <p className="mb-2 text-lg font-semibold">Product Stock</p>
-                <Field
-                  name="stock"
-                  className="w-full max-w-[600px] px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Type Here"
-                  type="number"
-                />
-                <ErrorMessage name="stock" component="div" className="text-red-500" />
-              </div>
-
-              {/* Product Price */}
-              <div className="w-full">
-                <p className="mb-2 text-lg font-semibold">Product Price</p>
-                <Field
-                  name="price"
-                  className="w-full max-w-[600px] px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Type Here"
-                  type="number"
-                />
-                <ErrorMessage name="price" component="div" className="text-red-500" />
-              </div>
-
-              {/* Product Weight */}
-              <div className="w-full">
-                <p className="mb-2 text-lg font-semibold">Product Weight</p>
-                <Field
-                  name="weight"
-                  className="w-full max-w-[600px] px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Type Here"
-                  type="number"
-                />
-                <ErrorMessage name="weight" component="div" className="text-red-500" />
-              </div>
+            <div className="w-full">
+              {renderField("Product Price", "price,", "number")}
+              {renderField("Product Sku", "sku,", "text")}
+              {renderField("Product Stock", "stock,", "number")}
+              {renderField("Product Weight", "weight,", "number")}
             </div>
           )}
-
-          {/* Category, Subcategory */}
-
-
 
           {/* Product Variants */}
-          <div className="w-auto">
-            {values.variants.length > 0 && (
-              <p className="block text-gray-700 text-lg font-semibold mb-2">
-                Product Variants
-              </p>
-            )}
-            <div>
-              {values.variants.map((variant, index) => (
-                <div key={index} className="flex flex-col mb-3 border gap-3 p-4 rounded-md">
-                  <div>
-                    <label htmlFor={`variants[${index}].name`} className="block text-gray-700 text-sm font-bold mb-2">
-                      Variant Name:
-                    </label>
-                    <Field
-                      type="text"
-                      placeholder="e.g., Color, Size"
-                      name={`variants[${index}].name`}
-                      className="shadow appearance-none border rounded-md w-70 py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <ErrorMessage name={`variants[${index}].name`} component="div" className="text-red-500" />
-                  </div>
-                  <div>
-                    {variant.options.map((option, optionIndex) => (
-                      <div key={optionIndex} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-[10rem,1.5fr,2.0fr,1.5fr,1.25fr,1fr] gap-4 mb-2 w-full">
-                        {/* Responsive grid for options */}
+          <div className="w-full">
+            <FieldArray name="variants">
+              {({ push, remove }) => (
+                <div>
+                  <h3 className="mb-4 text-lg font-semibold">
+                    Product Variants
+                  </h3>
+                  {values.variants.map((variant, index) => (
+                    <div key={index} className="border p-4 mb-4 rounded-md">
+                      {renderVariantField(
+                        "Variant Name",
+                        `variants[${index}].name`
+                      )}
 
-
-
-                        <Field
-                          type="text"
-                          placeholder="Option Name (e.g., Red, Large)"
-                          name={`variants[${index}].options[${optionIndex}].name`}
-                          className="shadow appearance-none border rounded-md w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <ErrorMessage name={`variants[${index}].options[${optionIndex}].name`} component="div" className="text-red-500" />
-
-                        <Field
-                          type="number"
-                          placeholder="Stock"
-                          name={`variants[${index}].options[${optionIndex}].stock`}
-                          className="shadow appearance-none border rounded-md w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-
-                        <Field
-                          type="number"
-                          placeholder="Price"
-                          name={`variants[${index}].options[${optionIndex}].price`}
-                          className="shadow appearance-none border rounded-md w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <ErrorMessage name={`variants[${index}].options[${optionIndex}].price`} component="div" className="text-red-500" />
-
-                        <Field
-                          type="number"
-                          placeholder="Weight (gram)"
-                          name={`variants[${index}].options[${optionIndex}].weight`}
-                          className="shadow appearance-none border rounded-md w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <ErrorMessage name={`variants[${index}].options[${optionIndex}].weight`} component="div" className="text-red-500" />
-
-                        <Field
-                          type="text"
-                          placeholder="SKU"
-                          name={`variants[${index}].options[${optionIndex}].sku`}
-                          className="shadow appearance-none border rounded-md w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <ErrorMessage name={`variants[${index}].options[${optionIndex}].sku`} component="div" className="text-red-500" />
-
-
-                        {/* Remove Option Button */}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setFieldValue(
-                              `variants[${index}].options`,
-                              variant.options.filter((_, i) => i !== optionIndex)
-                            )
-                          }
-                          className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-3 rounded-md items-center col-span-full sm:col-span-1 md:col-span-1 lg:col-span-1" // Adjust col-span for responsiveness
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                    {/* Add Option Button */}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setFieldValue(`variants[${index}].options`, [
-                          ...variant.options,
-                          { name: "", stock: 0, price: 0, sku: "", weight: 0 },
-                        ])
-                      }
-                      className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md"
-                    >
-                      Add Option
-                    </button>
-                  </div>
-
-                  {/* Remove Variant Button */}
+                      <FieldArray name={`variants[${index}].options`}>
+                        {({ push: pushOption, remove: removeOption }) => (
+                          <div className="mt-4">
+                            {variant.options.map((option, optionIndex) => (
+                              <div
+                                key={optionIndex}
+                                className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-4"
+                              >
+                                {renderVariantField(
+                                  "Option Name",
+                                  `variants[${index}].options[${optionIndex}].name`
+                                )}
+                                {renderVariantField(
+                                  "Stock",
+                                  `variants[${index}].options[${optionIndex}].stock`,
+                                  "number"
+                                )}
+                                {renderVariantField(
+                                  "Price",
+                                  `variants[${index}].options[${optionIndex}].price`,
+                                  "number"
+                                )}
+                                {renderVariantField(
+                                  "Weight",
+                                  `variants[${index}].options[${optionIndex}].weight`,
+                                  "number"
+                                )}
+                                {renderVariantField(
+                                  "SKU",
+                                  `variants[${index}].options[${optionIndex}].sku`,
+                                  "text",
+                                  "input",
+                                  "Enter SKU",
+                                   optionIndex ===0
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => removeOption(optionIndex)}
+                                  className="col-span-1 text-white bg-red-500 rounded-md mt-6 px-4 py-2 hover:bg-red-600"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                pushOption({
+                                  name: "",
+                                  stock: 0,
+                                  price: 0,
+                                  weight: 0,
+                                  sku: "",
+                                })
+                              }
+                              className="text-white bg-green-500 px-4 py-2 rounded-md hover:bg-green-600"
+                            >
+                              Add Option
+                            </button>
+                          </div>
+                        )}
+                      </FieldArray>
+                      <button
+                        type="button"
+                        onClick={() => remove(index)}
+                        className="text-white bg-red-500 px-4 py-2 rounded-md mt-4 hover:bg-red-600"
+                      >
+                        Remove Variant
+                      </button>
+                    </div>
+                  ))}
                   <button
                     type="button"
-                    onClick={() =>
-                      setFieldValue(
-                        "variants",
-                        values.variants.filter((_, i) => i !== index)
-                      )
-                    }
-                    className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-3 rounded-md items-center max-w-60"
+                    onClick={() => push({ name: "", options: [] })}
+                    className="text-white bg-blue-500 px-4 py-2 rounded-md hover:bg-blue-600"
                   >
-                    Remove Variant
+                    Add Variant
                   </button>
                 </div>
-              ))}
-              <button
-                type="button"
-                onClick={() =>
-                  setFieldValue("variants", [
-                    ...values.variants,
-                    { name: "", options: [{ name: "", stock: 0, price: 0, sku: "", weight: 0 }] },
-                  ])
-                }
-                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md"
-              >
-                Add Variant
-              </button>
-            </div>
+              )}
+            </FieldArray>
           </div>
+
           {/* Bestseller Checkbox */}
           <div className="mb-4">
             <label className="inline-flex items-center">
-              <Field type="checkbox" name="bestseller" className="form-checkbox" />
+              <Field
+                type="checkbox"
+                name="bestSeller"
+                className="form-checkbox h-5 w-5 text-gray-600"
+              />
               <span className="ml-2 text-gray-700">Add to bestseller</span>
             </label>
           </div>
 
           {/* Submit Button */}
-          <button type="submit" className="bg-black text-white px-6 py-2 rounded-md hover:bg-gray-800">
-            ADD
+          <button
+            type="submit"
+            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md"
+            disabled={isLoading}
+          >
+            {isLoading ? "Updating..." : "Update Product"}
           </button>
         </Form>
       )}

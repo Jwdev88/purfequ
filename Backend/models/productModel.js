@@ -19,16 +19,23 @@ const productSchema = new mongoose.Schema({
   //   ref: "Shop", // Relasi dengan model Shop (toko)
   //   required: true,
   // },
-  price: { type: Number},
-  // discount: { type: Number, default: 0 }, // Diskon dalam persen
-  stock: { type: Number},
+  price: { type: Number },
+  discount: { type: Number, default: 0 }, // Diskon dalam persen
+  stock: { type: Number },
   weight: { type: Number }, // Dalam gram
   // condition: { type: String, enum: ["new", "used"], default: "new" }, // Kondisi produk
-  // minOrder: { type: Number, default: 1 }, // Minimum order quantity
+  minOrder: { type: Number, default: 1 }, // Minimum order quantity
   // preorder: { type: Boolean, default: false }, // Preorder atau tidak
   // preorderDuration: { type: Number }, // Durasi preorder dalam hari (jika preorder = true)
   images: [{ type: String, required: true }], // Array of image URLs
-  sku: { type: String, unique: true }, // SKU unik untuk produk
+  sku: {
+    type: String,
+    required: true, // SKU wajib diisi
+    unique: true, // Pastikan SKU unik
+    trim: true, // Hilangkan spasi di awal dan akhir
+    uppercase: true, // konversi ke uppercase
+    nullable: false,
+  },
   variants: [
     {
       name: { type: String, required: true }, // Nama varian (misal: "Warna")
@@ -37,7 +44,7 @@ const productSchema = new mongoose.Schema({
           name: { type: String, required: true }, // Nama opsi (misal: "Merah")
           stock: { type: Number, required: true },
           price: { type: Number, required: true }, // Harga bisa berbeda per varian
-          sku: { type: String, unique: true }, // SKU untuk varian
+          sku: { type: String,required: true , unique: true}, // SKU untuk varian
           // image: { type: String }, // Gambar untuk varian
           weight: { type: Number, required: true }, // Berat dalam gram
         },
@@ -45,7 +52,7 @@ const productSchema = new mongoose.Schema({
     },
   ],
   bestSeller: { type: Boolean, default: false },
-  rating: { type: Number, default: 0 }, // Rating produk
+  rating: { type: Number, default: 5 }, // Rating produk
   // sold: { type: Number, default: 0 }, // Jumlah produk terjual
   // views: { type: Number, default: 0 }, // Jumlah views produk
   // status: { type: String, enum: ["active", "inactive"], default: "active" },
@@ -58,6 +65,7 @@ productSchema.pre("save", function (next) {
   next();
 });
 
-const Product = mongoose.models.product || mongoose.model("product", productSchema);
+const Product =
+  mongoose.models.product || mongoose.model("product", productSchema);
 
 export default Product;

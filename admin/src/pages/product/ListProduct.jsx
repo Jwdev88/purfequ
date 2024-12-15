@@ -101,7 +101,7 @@ const ProductList = ({ token }) => {
   
     // Handle product deletion
     const handleDelete = async (id) => {
-      if (window.confirm("Are you sure you want to delete this product?")) {
+      // if (window.confirm("Are you sure you want to delete this product?")) {
         try {
           await axios.post(
             backendURI + "/api/product/delete",
@@ -117,7 +117,7 @@ const ProductList = ({ token }) => {
           toast.success("Product deleted successfully");
         } catch (error) {
           toast.error("Error deleting product:", error.message);
-        }
+        // }
       }
     };
   

@@ -4,68 +4,40 @@ import { v2 as cloudinary } from "cloudinary";
 import mongoose from "mongoose";
 const addSubCategory = async (req, res) => {
   try {
-    const { name, category, description, status } = req.body;
-    const imageFile = req.file;
-
-    // Validation
-    if (!name) {
-      return res.status(400).json({
-        success: false,
-        message: "SubCategory validation failed: name is required",
-      });
+    const { name, description, status, category } = req.body;
+    const file = req.file;
+    if (!file) {
+      return res
+        .status(400)
+        .json({ success: false, message: "File gambar tidak ditemukan." });
     }
 
     if (!category) {
       return res.status(400).json({
         success: false,
-        message: "SubCategory validation failed: category is required",
+        message: "Category ID is required",
       });
     }
-
-    // Check for uniqueness within the category
-    const exists = await SubCategory.findOne({ name, category });
-    if (exists) {
-      return res.status(400).json({
-        success: false,
-        message: "Subcategory already exists in this category",
-      });
-    }
-
-    // Upload image to Cloudinary (if imageFile exists)
-    let imageURI = null;
-    if (imageFile) {
-      imageURI = await uploadImageToCloudinary(imageFile);
-    }
-
-    const subCategoryData = {
+    
+    console.log("Request body:", req.body);
+    console.log("Uploaded file:", req.file);
+    const result = await cloudinary.uploader.upload(req.file.path);
+    const newSubCategory = new SubCategory({
       name,
-      category,
       description,
-      status: status || "active",
-      image: imageURI,
-    };
+      status,
+      category: category,
+      image: result.secure_url,
+    });
 
-    const newSubCategory = new SubCategory(subCategoryData);
+
     await newSubCategory.save();
-
-    res.status(201).json({
-      success: true,
-      message: "Subcategory added successfully",
-    });
+    res
+      .status(200)
+      .json({ success: true, message: "Subcategory created successfully" });
   } catch (error) {
-    console.error("Error adding subcategory:", error);
-
-    if (error.code === "ENOENT") {
-      return res.status(500).json({
-        success: false,
-        message: `File not found: ${error.path}`,
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to add subcategory",
-    });
+    console.log(error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 async function uploadImageToCloudinary(imageFile) {
@@ -121,13 +93,17 @@ const getSubCategoryById = async (req, res) => {
     const { id } = req.params;
 
     if (!id) {
-      return res.status(400).json({ success: false, message: "SubCategory ID is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "SubCategory ID is required" });
     }
 
     const subcategory = await SubCategory.findById(id).populate("category");
 
     if (!subcategory) {
-      return res.status(404).json({ success: false, message: "Subcategory not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Subcategory not found" });
     }
 
     let imageData = [];
@@ -136,7 +112,7 @@ const getSubCategoryById = async (req, res) => {
       try {
         const publicId = subcategory.image.split("/").pop().split(".")[0];
         const cloudinaryData = await cloudinary.api.resource(publicId);
-        imageData = [cloudinaryData]; 
+        imageData = [cloudinaryData];
       } catch (cloudinaryError) {
         console.error("Cloudinary error:", cloudinaryError);
         imageData = [{ secure_url: "/path/to/default/image.jpg" }]; // Use a default image URL
@@ -150,10 +126,11 @@ const getSubCategoryById = async (req, res) => {
         imageData: imageData,
       },
     });
-
   } catch (error) {
     if (error.name === "CastError") {
-      return res.status(400).json({ success: false, message: "Invalid Subcategory ID format" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid Subcategory ID format" });
     }
     console.error("Error getting subcategory by ID:", error);
     res.status(500).json({
@@ -167,12 +144,18 @@ const updateSubCategory = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description, status } = req.body;
-    
+    const file = req.file;
+    if (!file) {
+      return res
+        .status(400)
+        .json({ success: false, message: "File gambar tidak ditemukan." });
+    }
+
     let updatedsubCategory;
     if (req.file) {
       try {
         const result = await cloudinary.uploader.upload(req.file.path);
-       updatedsubCategory = await SubCategory.findByIdAndUpdate(
+        updatedsubCategory = await SubCategory.findByIdAndUpdate(
           id,
           {
             name,
@@ -226,7 +209,10 @@ const updateSubCategory = async (req, res) => {
         );
       } else if (typeof updatedsubCategory.image === "string") {
         // Handle cases where 'image' is a single string (older data format)
-        const publicId = updatedsubCategory.image.split("/").pop().split(".")[0];
+        const publicId = updatedsubCategory.image
+          .split("/")
+          .pop()
+          .split(".")[0];
         try {
           imageData = [await cloudinary.api.resource(publicId)];
         } catch (cloudinaryError) {

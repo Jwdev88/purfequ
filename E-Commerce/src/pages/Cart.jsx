@@ -13,16 +13,19 @@ const Cart = () => {
     if (products.length > 0) {
       const tempData = [];
       for (const items in cartItems) {
-        for (const item in cartItems[items]) {
-          if (cartItems[items][item]) {
-            const productData = products.find((product) => product._id === items);
-            tempData.push({
-              _id: items,
-              items,
-              size: item,
-              quantity: cartItems[items][item],
-              totalPrice: productData.price * cartItems[items][item],
-            });
+        for (const variantName in cartItems[items]) {
+          for (const variantOption in cartItems[items][variantName]) {
+            if (cartItems[items][variantName][variantOption] > 0) {
+              const productData = products.find((product) => product._id === items);
+              tempData.push({
+                _id: items,
+                items,
+                variantName,
+                variantOption,
+                quantity: cartItems[items][variantName][variantOption],
+                totalPrice: productData.variants.find((variant) => variant.name === variantName).options.find((option) => option.name === variantOption).price * cartItems[items][variantName][variantOption],
+              });
+            }
           }
         }
       }
@@ -51,9 +54,9 @@ const Cart = () => {
                 >
                   <button
 
-                    onClick={() => updateQuanity(item._id, item.size, 0)}
+                    onClick={() => updateQuanity(item._id, item.variantName, item.variantOption, 0)}
                     className="absolute top-0 right-0 mt-2 py-4 mr-2 text-gray-500 hover:text-gray-700"
-                  ><img onClick={() => updateQuanity(item._id, item.size, 0)} src={assets.cross_icon} className='w-4 mr-4 sm:w-5 cursor-pointer ' alt="" />
+                  ><img onClick={() => updateQuanity(item._id, item.variantName, item.variantOption, 0)} src={assets.cross_icon} className='w-4 mr-4 sm:w-5 cursor-pointer ' alt="" />
 
 
                   </button>
@@ -63,7 +66,7 @@ const Cart = () => {
                       <p className="text-lg font-semibold">{productData.name}</p>
                       <p className="font-medium text-gray-500">{productData.category}</p>
                       <p className="font-medium text-gray-900">{formatIDR(productData.price)}</p>
-                      <p className="font-medium text-green-500">{item.size}</p>
+                      <p className="font-medium text-green-500">{item.variantName} - {item.variantOption}</p>
                     </div>
                   </div>
                   <div className="flex items-center mt-4 sm:mt-0">
@@ -71,7 +74,7 @@ const Cart = () => {
                       onChange={(e) =>
                         e.target.value === '' || e.target.value === '0'
                           ? null
-                          : updateQuanity(item._id, item.size, Number(e.target.value))
+                          : updateQuanity(item._id, item.variantName, item.variantOption, Number(e.target.value))
                       }
                       className="border border-gray-300 rounded-md p-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent"
                       defaultValue={item.quantity}
@@ -107,10 +110,6 @@ const Cart = () => {
     </div>
   );
 };
-
-
-
-
 
 
 export default Cart;

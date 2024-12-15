@@ -4,20 +4,6 @@ import Category from "../models/categoryModel.js";
 import mongoose from "mongoose";
 
 const addProduct = async (req, res) => {
-  const calculateTotalStock = (variants) => {
-    if (!variants || variants.length === 0) {
-      return 0; // Handle empty variants array
-    }
-
-    return variants.reduce((total, variant) => {
-      if (variant && typeof variant.stock === "number") {
-        return total + variant.stock;
-      } else {
-        console.error("Invalid variant:", variant);
-        return total; // Or handle invalid variants differently
-      }
-    }, 0);
-  };
   try {
     const {
       name,
@@ -28,18 +14,19 @@ const addProduct = async (req, res) => {
       category,
       subCategory,
       variants,
-      bestseller,
+      bestSeller,
       sku,
     } = req.body;
 
-    const image1 = req.files.image1 && req.files.image1[0];
-    const image2 = req.files.image2 && req.files.image2[0];
-    const image3 = req.files.image3 && req.files.image3[0];
-    const image4 = req.files.image4 && req.files.image4[0];
+    console.log("req.body", req.body);
 
-    const images = [image1, image2, image3, image4].filter(
-      (item) => item !== undefined
-    );
+    // Handle image uploads
+    const image1 = req.files?.image1?.[0];
+    const image2 = req.files?.image2?.[0];
+    const image3 = req.files?.image3?.[0];
+    const image4 = req.files?.image4?.[0];
+
+    const images = [image1, image2, image3, image4].filter(Boolean);
 
     const imagesURI = await Promise.all(
       images.map(async (item) => {
@@ -49,18 +36,42 @@ const addProduct = async (req, res) => {
         return result.secure_url;
       })
     );
-    let parsedVariants = [];
-    if (typeof variants === "string" && variants.trim() !== "") {
-      try {
-        parsedVariants = JSON.parse(variants);
-      } catch (error) {
-        console.error("Error parsing variants:", error);
-        // Tangani error parsing, misalnya dengan memberikan response error
-        return res.status(400).json({
-          success: false,
-          message: "Invalid variants data",
-        });
+
+    // Parse variants data
+    let parsedVariants;
+    try {
+      parsedVariants =
+        typeof variants === "string" ? JSON.parse(variants) : variants;
+
+      // Validate variants structure
+      if (!Array.isArray(parsedVariants)) {
+        throw new Error("Variants must be an array");
       }
+
+      // Ensure at least one variant exists
+      if (parsedVariants.length === 0) {
+        throw new Error("At least one variant is required");
+      }
+
+      // Validate each variant and its options
+      parsedVariants.forEach((variant, index) => {
+        if (!variant.name || !Array.isArray(variant.options)) {
+          throw new Error(`Invalid variant structure at index ${index}`);
+        }
+
+        variant.options.forEach((option, optIndex) => {
+          if (!option.name || typeof option.stock !== "number") {
+            throw new Error(
+              `Invalid option structure in variant ${index}, option ${optIndex}`
+            );
+          }
+        });
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid variants data: ${error.message}`,
+      });
     }
 
     const productData = {
@@ -71,26 +82,66 @@ const addProduct = async (req, res) => {
       stock: Number(stock),
       weight: Number(weight),
       subCategory,
-      bestseller: bestseller === "true" ? true : false,
-      variants: parsedVariants,
-      images: imagesURI, // Menggunakan 'images' sesuai skema
-      stock: calculateTotalStock(parsedVariants), // Menghitung total stok dari varian
-      sku: sku,
-      // calculateAverageWeight(JSON.parse(variants)), // Menghitung rata-rata berat dari varian (opsional)
+      bestSeller: bestSeller === "true",
+      images: imagesURI,
+      sku,
+      variants: parsedVariants.map((variant) => ({
+        name: variant.name,
+        options: variant.options.map((option) => ({
+          name: option.name,
+          stock: Number(option.stock),
+          price: Number(option.price),
+          sku: option.sku,
+          weight: Number(option.weight),
+        })),
+      })),
     };
 
-    const product = new Product(productData);
-    await product.save();
+    try {
+      const product = new Product(productData);
+  
+      await product.save();
 
-    res
-      .status(201)
-      .json({ success: true, message: "Product berhasil ditambahkan" });
-    console.log(product);
+      res.status(201).json({
+        success: true,
+        message: "Produk berhasil ditambahkan",
+      });
+    } catch (error) {
+      if (error.code === 11000) {
+        console.log("Duplicate key error:", error);
+        if (error.keyPattern.sku) {
+          return res.status(400).json({
+            success: false,
+            message: "SKU produk sudah terdaftar.",
+          });
+        } else if (error.keyPattern["variants.options.sku"]) {
+          return res.status(400).json({
+            success: false,
+            message: "SKU varian sudah terdaftar.",
+          });
+        }
+      }
+
+      if (error.errors?.sku) {
+        return res.status(400).json({
+          success: false,
+          message: error.errors.sku.message,
+        });
+      }
+
+      console.error("Error creating product:", error);
+      res.status(500).json({
+        success: false,
+        message: "Terjadi kesalahan server.",
+      });
+    }
   } catch (error) {
-    console.error(error);
-    res.json({ success: false, message: error.message });
+    console.error("Error in product creation:", error);
+    res.status(500).json({
+      success: false,
+      message: "Terjadi kesalahan server.",
+    });
   }
-  // Fungsi untuk menghitung total stok dari semua varian
 };
 
 const editProduct = async (req, res) => {
@@ -101,13 +152,12 @@ const editProduct = async (req, res) => {
       description,
       category,
       subCategory,
-      variants,
-      bestseller,
+      bestSeller,
       price,
       weight,
       stock,
       sku,
-     
+      variants,
     } = req.body;
 
     const image1 = req.files.image1 && req.files.image1[0];
@@ -124,15 +174,16 @@ const editProduct = async (req, res) => {
     const updatedData = {
       name: name,
       description: description,
+      sku: sku,
       price: price,
       category: category,
       subCategory: subCategory,
       variants: variants ? JSON.parse(variants) : undefined, // Menggunakan variants
-      bestseller: bestseller === "true" ? true : false,
+      bestSeller: bestSeller === "true" ? true : false,
       stock: stock,
-      // stock: variants ,
-      // ? calculateTotalStock(JSON.parse(variants)) : undefined, // Update stok
       weight: weight,
+      
+      // Update stock only if variants are provided
       // variants ? calculateAverageWeight(JSON.parse(variants)) : undefined, // Update berat (opsional)
     };
 
@@ -197,9 +248,9 @@ const getProductById = async (req, res) => {
     }
 
     const product = await Product.findById(Id)
-    .populate("category subCategory")
-    .populate("variants")
-    .populate("variants.options");
+      .populate("category subCategory")
+      .populate("variants")
+      .populate("variants.options");
     res.json({ success: true, product });
   } catch (error) {
     console.log(error);

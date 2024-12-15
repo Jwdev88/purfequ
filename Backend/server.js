@@ -19,7 +19,6 @@ connectCloudinary()
 //middleware
 app.use(express.json())
 app.use(cors())
-
 //api endpoint
 app.use('/api/user',userRouter)
 app.use('/api/product',productRouter)

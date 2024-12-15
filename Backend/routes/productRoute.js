@@ -22,14 +22,7 @@ productRouter.post(
     { name: "image4", maxCount: 1 },
   ]),
   adminAuth,
-  (req, res) => { 
-    try {
-      addProduct(req, res);
-    } catch (error) {
-      console.error("Error in addProduct:", error);
-      res.status(500).json({ success: false, message: "Failed to add product" });
-    }
-  }
+  addProduct
 );
 productRouter.post("/delete", adminAuth, deleteProduct);
 productRouter.get("/:Id/get", getProductById);

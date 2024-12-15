@@ -1,139 +1,226 @@
-import React, { useContext, useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { ShopContext } from '../context/ShopContext';
-import RelatedProducts from '../components/RelatedProducts';
-import { assets } from '../assets/assets';
-import { toast } from 'react-toastify';
+import React, { useContext, useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+import { ShopContext } from "../context/ShopContext"; // Import ShopContext untuk cart
+import RelatedProducts from "../components/RelatedProducts";
+import { Stars } from "lucide-react";
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 const Product = () => {
   const { productId } = useParams();
   const { products, addToCart, formatIDR } = useContext(ShopContext);
-  const [productData, setProductData] = useState(null); // Inisialisasi dengan null
-  const [image, setImage] = useState('');
-  const [size, setSize] = useState('')
-
-  const handleAddToCart = () => {
-    if (productData.sizes.length > 0 && !size) {
-      // Jika ada pilihan size dan belum dipilih, tampilkan pesan error
-      toast.error('Please select a size');
-    } else {
-      // Jika tidak ada pilihan size atau size sudah dipilih, tambahkan ke cart
-      addToCart(productData._id, size);
+  const [productData, setProductData] = useState(null);
+  const [image, setImage] = useState("");
+  const [selectedVariants, setSelectedVariants] = useState({});
+  const [isLoading, setIsLoading] = useState(true);
+  useEffect(() => {
+    // Initialize selectedVariants if not defined
+    if (
+      productData?.variants?.length > 0 &&
+      Object.keys(selectedVariants).length === 0
+    ) {
+      const initialVariants = {};
+      productData.variants.forEach((variant) => {
+        initialVariants[variant.name] = variant.options[0].name; // Set to the first option by default
+      });
+      setSelectedVariants(initialVariants);
     }
+  }, [productData, selectedVariants]);
+  
+
+  const getVariantPrice = () => {
+    if (!productData || !productData.variants || productData.variants.length === 0) {
+      return productData?.price || 0; // Handle kasus jika tidak ada varian
+    }
+
+    let variantPrice = productData.price;
+
+    for (const variant of productData.variants) {
+      const selectedOption = selectedVariants[variant.name];
+      if (selectedOption) {
+        const optionData = variant.options.find(option => option.name === selectedOption);
+        if (optionData && optionData.price !== undefined) {
+          variantPrice = optionData.price;
+          break; // harga sudah ketemu, stop looping
+        }
+      }
+    }
+
+    return variantPrice;
   };
 
 
-  const fetchProductData = async () => {
-
-    products.find((item) => {
-      if (item._id === productId) {
-        setProductData(item)
-        setImage(item.image[0])
-
-        return null
-      }
-    })
-  }
-
-
   useEffect(() => {
-    fetchProductData();
+    // Cari produk berdasarkan productId
+    const foundProduct = products.find((item) => item._id === productId);
+    if (foundProduct) {
+      setProductData(foundProduct);
+      if (foundProduct.images && foundProduct.images.length > 0) {
+        setImage(foundProduct.images[0]);
+      }
+    }
+    setIsLoading(false);
   }, [productId, products]);
 
-  return productData ? (
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
+  if (!productData) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <p>Produk tidak ditemukan.</p>
+      </div>
+    );
+  }
+
+  const handleAddToCart = () => {
+    if (
+      productData?.variants?.length > 0 &&
+      Object.keys(selectedVariants).length !== productData.variants.length
+    ) {
+      toast.error("Silahkan pilih semua varian.");
+    } else {
+      const selectedVariantId = getSelectedVariantId(); // New function to get variant ID
+      addToCart(productData._id, selectedVariantId); // Pass the variant ID
+      toast.success(`"${productData.name}" telah ditambahkan ke keranjang`);
+    }
+  };
+
+  const getSelectedVariantId = () => {
+    if (!productData?.variants || productData.variants.length === 0) {
+      return productData._id; // No variants, add the entire product
+    }
+  
+    // Find the variant matching the selected options
+    const matchingVariant = productData.variants.find((variant) => {
+      return Object.entries(selectedVariants).every(([variantName, selectedOption]) => {
+        return variant.name === variantName && variant.options.some((option) => option.name === selectedOption);
+      });
+    });
+  
+    return matchingVariant?._id; // Return the ID of the matching variant or undefined if not found
+  };
+
+  const handleVariantChange = (variantName, option) => {
+    setSelectedVariants({ ...selectedVariants, [variantName]: option });
+    const selectedVariant = productData.variants.find(
+      (variant) => variant.name === variantName
+    );
+    const selectedOption = selectedVariant.options.find(
+      (option) => option.name === option
+    );
+    setImage(selectedOption.image);
+  };
+
+  return (
     <div className="border-t-2 pt-10 transition-opacity ease-in duration-500 opacity-100">
-      {/* Produk data */}
       <div className="flex gap-12 sm:gap-12 flex-col sm:flex-row">
-        {/* Produk image */}
         <div className="flex-1 flex flex-col-reverse gap-3 sm:flex-row">
           <div className="flex sm:flex-col overflow-x-auto sm:overflow-y-scroll justify-between sm:justify-normal sm:w-[18.7%] w-full scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-            {
-              productData.image.map((item, index) => (
-                <img
-                  onClick={() => setImage(item)}
-                  src={item}
-                  key={index}
-                  className="w-[24%] sm:w-full sm:mb-3 flex-shrink-0 cursor-pointer" // Tambahkan cursor-pointer
-                  alt=""
-                />
-              ))}
+            {productData.images.map((item, index) => (
+              <img
+                onClick={() => setImage(item)}
+                src={item}
+                key={index}
+                className="w-[24%] sm:w-full sm:mb-3 flex-shrink-0 cursor-pointer"
+                alt=""
+              />
+            ))}
           </div>
           <div className="w-full sm:w-[80%]">
-            <img className="w-full h-auto" src={image} alt="" />
+            <img className="w-full h-auto" src={image} alt={productData.name} />{" "}
+            {/* Alt tag penting untuk SEO */}
           </div>
         </div>
 
-        {/* Info produk */}
         <div className="flex-1">
-          <h1 className="font-medium text-2xl gap-1 mt-2">{productData.name}</h1>
-          <div className="flex items-center gap-1 mt-2">
-            <img src={assets.star_icon} className="w-3 h-3" alt="" /> {/* Perbaiki className */}
-            <img src={assets.star_icon} className="w-3 h-3" alt="" /> {/* Perbaiki className */}
-            <img src={assets.star_icon} className="w-3 h-3" alt="" /> {/* Perbaiki className */}
-            <img src={assets.star_icon} className="w-3 h-3" alt="" /> {/* Perbaiki className */}
-            <img src={assets.star_dull_icon} className="w-3 h-3" alt="" /> {/* Perbaiki className */}
-            <p className="pl-2">(122)</p>
-          </div>
-          <p className="mt-2 text-2xl font-medium">
+          <h1 className="font-medium text-2xl gap-1 mt-2">
+            {productData.name}
+          </h1>
 
-            {formatIDR(productData.price)}
-          </p>
+          {/* ... (rating stars - jika ada) */}
+          <div className="mt-4 flex items-center">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Stars
+                key={i}
+                className={`w-6 h-6 ${
+                  i < Math.floor(productData.rating)
+                    ? "text-yellow-400"
+                    : "text-gray-300"
+                }`}
+                fill="currentColor"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            ))}
+            <span className="ml-2 text-xl font-semibold text-gray-700">
+             
+             
+            </span>
+          </div>
+          <p className="mt-2 text-sm font-medium">Product Rating : {productData.rating.toFixed(1)} </p>
+          <p className="mt-2 text-2xl font-medium">{formatIDR(getVariantPrice())}</p>
+
 
           <p className="mt-2 text-sm font-medium">
-            <span className="font-semibold">Category : </span> {productData.category}
+            <span className="font-semibold">Kategori: </span>{" "}
+            {productData.category.name} {/* Akses nama kategori */}
           </p>
-          <p className="mt-3 text-gray-500 md:w-4/5">{productData.description}</p>
-          <div className="flex flex-col gap-4 my-8">
-
-            {productData.sizes.length > 0 && ( // Tampilkan hanya jika sizes.length > 0
-              <div>
-                <p>Select Sizes</p>
-                <div className="flex flex-wrap gap-2">
-                  {productData.sizes.map((item, index) => (
-                    <button
-                      key={index}
-                      onClick={() => setSize(item)}
-                      className={`size-button border px-3 py-2 rounded-md border-gray-200 hover:bg-gray-100 
-                     ${item === size ? 'active-size bg-blue-100 border-blue-500 text-blue-700' : ''}`}
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              </div>
+          <p className="mt-3 text-gray-500 md:w-4/5">
+            {productData.description}
+          </p>
+          <div className="flex flex-col gap-4 my-2">
+            {productData.variants && productData.variants.length > 0 && (
+              <p className="font-semibold font-serif">Pilihan Varian</p>
             )}
+            {productData.variants &&
+              productData.variants.length > 0 &&
+              productData.variants.map((variant) => (
+                <div key={variant._id}>
+                  <p>{variant.name}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {variant.options.map((option) => (
+                      <button
+                        key={option._id}
+                        onClick={() =>
+                          handleVariantChange(variant.name, option.name)
+                        }
+                        className={`size-button border px-3 py-2 rounded-md border-gray-200 hover:bg-gray-100 ${
+                          selectedVariants[variant.name] === option.name
+                            ? "active-size bg-blue-100 border-blue-500 text-blue-700"
+                            : ""
+                        }`}
+                      >
+                        {option.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
           </div>
-
           <div>
-            <button onClick={handleAddToCart} className='bg-black text-white px-8 py-3 text-sm mt-4 active:bg-gray-700'>
-              ADD TO CART
+            <button
+              onClick={handleAddToCart}
+              className="bg-black text-white px-8 py-3 text-sm mt-4 active:bg-gray-700"
+            >
+              TAMBAH KE KERANJANG
             </button>
           </div>
-          <hr className='mt-8 sm:2-4/5' />
-          <div className='text-sm text-gray-500 flex flex-col gap-1'>
-            <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Culpa perferendis debitis omnis numquam. Qui sit provident ipsum pariatur perspiciatis cum harum, vitae dolorem quam repellat doloribus! Iure sint officiis perspiciatis.</p>
-          </div>
+          {/* ... (deskripsi dan review) */}
         </div>
       </div>
-      {/* Desciptiom & Review Sectiom */}
-      <div className='mt-20'>
-        <div className='flex'>
-          <b className='border px-5 py-3 text-sm'>Description</b>
-          <b className='border px-5 py-3 text-sm'>Reviews (122) </b>
-
-        </div>
-        <div className='flex flex-col gap-4 border px-6 py-6 text-sm text-gray-500'>
-          <p>Lorem, ipsum dolor sit amet consectetur adipisicing elit. Asperiores, omnis similique? Similique exercitationem harum veniam aperiam minima earum? Eius culpa eligendi dolore fugiat dicta temporibus ducimus consectetur dolor quo cum.</p>
-          <p>Lorem, ipsum dolor sit amet consectetur adipisicing elit. Asperiores, omnis similique? Similique exercitationem harum veniam aperiam minima earum? Eius culpa eligendi dolore fugiat dicta temporibus ducimus consectetur dolor quo cum.</p>
-        </div>
-      </div>
-      {/*Display related products*/}
-
-      <RelatedProducts category={productData.category} subCategory={productData.subCategory} />
-
-
+      <RelatedProducts
+        category={productData.category.name}
+        subCategory={productData.subCategory.name}
+      />
+      {/* Akses nama kategori dan subkategori */}
     </div>
-  ) : (
-    <div className="opacity-0"></div>
   );
 };
 

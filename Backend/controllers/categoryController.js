@@ -70,62 +70,51 @@ async function uploadImageToCloudinary(imageFile) {
 // Get all categories
 const getCategories = async (req, res) => {
   try {
+    // Fetch Categories
     const categories = await Category.find();
     const subCategories = await SubCategory.find().populate("category");
+
+    // Process categories with Cloudinary image data
     const categoriesWithImageData = await Promise.all(
       categories.map(async (category) => {
-        let imageData = [];
+        let imageData = null;
+
         if (typeof category.image === "string") {
-          const publicId = category.image.split("/").pop().split(".")[0];
           try {
+            const publicId = category.image.split("/").pop().split(".")[0];
             const cloudinaryData = await cloudinary.api.resource(publicId);
-            imageData = [cloudinaryData]; // Store the image data in an array
+            imageData = cloudinaryData.secure_url; // Ambil URL aman dari Cloudinary
           } catch (cloudinaryError) {
             console.error("Cloudinary error:", cloudinaryError);
-            imageData = []; // Handle errors by setting imageData to an empty array
-          }
-        } else {
-          // Handle cases where category.image is not a string (if applicable)
-          if (Array.isArray(category.image) && category.image.length > 0) {
-            try {
-              imageData = await Promise.all(
-                category.image.map(async (imageUrl) => {
-                  if (typeof imageUrl === "string") {
-                    const publicId = imageUrl.split("/").pop().split(".")[0];
-                    try {
-                      const cloudinaryData = await cloudinary.api.resource(
-                        publicId
-                      );
-                      return cloudinaryData;
-                    } catch (cloudinaryError) {
-                      console.error("Cloudinary error:", cloudinaryError);
-                      return null; // Or handle the Cloudinary error differently
-                    }
-                  } else {
-                    console.warn("Invalid image URL:", imageUrl);
-                    return null;
-                  }
-                })
-              );
-            } catch (mappingError) {
-              console.error("Error mapping images:", mappingError);
-              // You might want to handle this error differently,
-              // e.g., by returning a partial response or a specific error message
-            }
           }
         }
 
         return {
-          ...category.toObject(),
-          imageData: imageData,
+          _id: category._id,
+          name: category.name,
+          image: imageData || category.image, // Fallback jika Cloudinary gagal
         };
       })
     );
 
+    // Process SubCategories to flatten populated data
+    const formattedSubCategories = subCategories.map((subCategory) => ({
+      _id: subCategory._id,
+      name: subCategory.name,
+      description: subCategory.description || null,
+      status: subCategory.status,
+      categoryId: subCategory.category ? subCategory.category._id : null,
+      categoryName: subCategory.category
+        ? subCategory.category.name
+        : "Unassigned",
+      image: subCategory.image,
+    }));
+
+    // Send Response
     res.status(200).json({
       success: true,
       categories: categoriesWithImageData,
-      subCategories,
+      subCategories: formattedSubCategories,
     });
   } catch (error) {
     console.error("Error fetching categories:", error);

@@ -33,47 +33,24 @@ const Add = ({ token }) => {
     description: Yup.string().required("Deskripsi wajib diisi"),
     category: Yup.string().required("Kategori wajib diisi"),
     subCategory: Yup.string().required("Subkategori wajib diisi"),
-    // sku: Yup.string().required("SKU wajib diisi"),
-    // stock: Yup.number().required("Stok wajib diisi").integer("Stok harus berupa bilangan bulat").min(1, "Stok tidak boleh kosong"),
-    // price: Yup.number().required("Harga wajib diisi").positive("Harga harus positif"),
-    // weight: Yup.number().required("Berat wajib diisi").min(100, "Berat minimal 100 gram"),
-    // // Conditional validation for stock
-
     stock: Yup.number().when("variants", (variants, schema) => {
-      return variants && variants.length > 0 // Check if variants array is NOT empty
+      return variants && variants.length > 0
         ? schema.nullable()
         : schema
             .required("Stok wajib diisi")
             .integer("Stok harus berupa bilangan bulat")
             .min(0, "Stok tidak boleh kosong");
     }),
-    // Conditional validation for price
     price: Yup.number().when("variants", (variants, schema) => {
-      return variants && variants.length > 0 // Check if variants array is NOT empty
+      return variants && variants.length > 0
         ? schema.nullable()
         : schema.required("Harga wajib diisi").positive("Harga harus positif");
     }),
-
-    // Conditional validation for SKU
-
-    // sku: Yup.string().when("variants", (variants, schema) => {
-
-    //   return variants && variants.length > 0 // Check if variants array is NOT empty
-
-    //     ? schema.nullable()
-
-    //     : schema.required("SKU wajib diisi");
-
-    // }),
-
-    // Conditional validation for weight
-
     weight: Yup.number().when("variants", (variants, schema) => {
-      return variants && variants.length > 0 // Check if variants array is NOT empty
+      return variants && variants.length > 0
         ? schema.nullable()
         : schema.required("Berat wajib diisi").min(0, "Berat minimal 100 gram");
     }),
-
     variants: Yup.array().of(
       Yup.object().shape({
         name: Yup.string().required("Nama varian wajib diisi"),
@@ -96,16 +73,17 @@ const Add = ({ token }) => {
     ),
   });
 
-  useEffect(() => {
+    useEffect(() => {
     const fetchCategories = async () => {
+      setIsLoading(true);
       try {
-        setIsLoading(true);
         const response = await axios.get(backendURI + "/api/category/list", {
           headers: { token },
         });
         setCategories(response.data.categories);
       } catch (error) {
-        toast.error("Gagal mengambil data Category:", error.message);
+        console.error("Error fetching categories:", error);
+        toast.error("Gagal mengambil data Category");
       } finally {
         setIsLoading(false);
       }
@@ -114,70 +92,110 @@ const Add = ({ token }) => {
     fetchCategories();
   }, [token]);
 
-  // Fetch subcategories when token changes
   useEffect(() => {
     const fetchSubCategories = async () => {
-      try {
-        setIsLoading(true);
-        const response = await axios.get(
-          `${backendURI}/api/subcategory/list`,
-          {
-            headers: { token },
-          }
-        );
-        setSubCategories(response.data.subCategories);
-      } catch (error) {
-        toast.error("Gagal mengambil data Subcategory:", error.message);
-      } finally {
-        setIsLoading(false);
+      if (selectedCategory) {
+        try {
+          const response = await axios.get(
+            `${backendURI}/api/subcategory/list?category=${selectedCategory}`,
+            { headers: { token } }
+          );
+          setSubCategories(response.data.subCategories);
+        } catch (error) {
+          console.error("Error fetching subcategories:", error);
+          toast.error("Gagal mengambil data subCategory");
+        }
+      } else {
+        // Clear subCategories when no category is selected
+        setSubCategories([]);
       }
     };
 
     fetchSubCategories();
-  }, [token, selectedCategory]);
+  }, [selectedCategory, token]);
+
+
+
 
   const onSubmitHandler = async (values) => {
     try {
       const formData = new FormData();
       let totalStock = 0;
-      if (values.variants.length > 0) {
-        for (const variant of values.variants) {
-          for (const option of variant.options) {
-            totalStock += option.stock;
-          }
-        }
+
+      // Log for debugging
+      console.log("Data values before FormData:", values);
+
+      // Handle variants data
+      if (
+        values.variants &&
+        Array.isArray(values.variants) &&
+        values.variants.length > 0
+      ) {
+        // Convert variants array to string to preserve structure
+        formData.append(
+          "variants",
+          JSON.stringify(
+            values.variants.map((variant) => ({
+              name: variant.name,
+              options: variant.options.map((option) => ({
+                name: option.name,
+                stock: Number(option.stock),
+                price: Number(option.price),
+                sku: option.sku,
+                weight: Number(option.weight),
+              })),
+            }))
+          )
+        );
+
+        // Calculate total stock from variants
+        totalStock = values.variants.reduce((total, variant) => {
+          return (
+            total +
+            variant.options.reduce((variantTotal, option) => {
+              return variantTotal + (Number(option.stock) || 0);
+            }, 0)
+          );
+        }, 0);
       } else {
+        // If no variants, create a default variant structure
+        const defaultVariant = [
+          {
+            name: "Default",
+            options: [
+              {
+                name: "Standard",
+                stock: values.stock,
+                price: values.price,
+                sku: values.sku,
+                weight: values.weight,
+              },
+            ],
+          },
+        ];
+        formData.append("variants", JSON.stringify(defaultVariant));
         totalStock = values.stock;
       }
 
-      // Append total stock to formData
+      // Handle other non-variant fields
       formData.append("stock", totalStock);
+      formData.append("name", values.name);
+      formData.append("description", values.description);
+      formData.append("price", values.price);
+      formData.append("weight", values.weight);
+      formData.append("category", values.category);
+      formData.append("subCategory", values.subCategory);
+      formData.append("bestSeller", values.bestSeller);
+      formData.append("sku", values.sku);
 
-      for (let key in values) {
+      // Handle images
+      for (const key in values) {
         if (key.startsWith("image") && values[key]) {
-          formData.append(key, values[key]);
-        } else if (key === "variants") {
-          // Periksa apakah values.variants adalah array dan tidak kosong
-          if (Array.isArray(values.variants) && values.variants.length > 0) {
-            // Kirim setiap varian sebagai object terpisah
-            values.variants.forEach((variant, index) => {
-              formData.append(`variants[${index}]`, JSON.stringify(variant));
-            });
-          }
-        } else {
           formData.append(key, values[key]);
         }
       }
-      // for (let key in values) {
-      //   if (key.startsWith("image") && values[key]) {
-      //     formData.append(key, values[key]);
-      //   } else if (key === "variants") {
-      //     // Stringify the variants array
-      //     formData.append(key, JSON.stringify(values.variants));
-      //   } else {
-      //     formData.append(key, values[key]);
-      //   }
-      // }
+
+      console.log("Data values after FormData:", values);
 
       const response = await axios.post(
         backendURI + "/api/product/add",
@@ -187,16 +205,15 @@ const Add = ({ token }) => {
 
       if (response.data.success) {
         toast.success(response.data.message);
-        // Reset form setelah berhasil
-        // ...
         console.log(response.data);
+        // navigate("/products");
       } else {
         toast.error(response.data.message);
         console.log(response.data);
       }
     } catch (error) {
-      console.error(error);
-      toast.error(error.message);
+      console.error("Error submitting product:", error);
+      toast.error(error.response?.data?.message || error.message);
     }
   };
   return (
@@ -271,73 +288,70 @@ const Add = ({ token }) => {
             />
           </div>
 
-          {isLoading ? (
-            <div>Loading categories and subcategories...</div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-auto">
-              {/* Category select */}
-              <div className="mb-6">
-                <label
-                  htmlFor="category"
-                  className="block text-gray-700 text-sm font-semibold mb-2"
-                >
-                  Product Category
-                </label>
-                <Field
-                  as="select"
-                  name="category"
-                  id="category"
-                  onChange={(e) => {
-                    setFieldValue("category", e.target.value); // Update Formik's 'category'
-                    setSelectedCategory(e.target.value); // Update 'selectedCategory' state
-                  }}
-                  className="shadow appearance-none border rounded-md py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 w-60"
-                >
-                  <option value="">Select a Category</option> Added a default
-                  option
-                  {categories.map((category) => (
-                    <option key={category._id} value={category._id}>
-                      {category.name.toUpperCase()}{" "}
-                      {/* Access the name property */}
-                    </option>
-                  ))}
-                </Field>
-                <ErrorMessage
-                  name="category"
-                  component="div"
-                  className="text-red-500"
-                />
-              </div>
-
-              {/* Subcategory select */}
-              <div className="mb-6">
-                <label
-                  htmlFor="subCategory"
-                  className="block text-gray-700 text-sm font-semibold mb-2"
-                >
-                  Product Subcategory
-                </label>
-                <Field
-                  as="select"
-                  name="subCategory"
-                  id="subCategory"
-                  className="shadow appearance-none border rounded-md w-60 py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select a subcategory</option>
-                  {subCategories.map((subCategory) => (
-                    <option key={subCategory._id} value={subCategory._id}>
-                      {subCategory.name.toUpperCase()}
-                    </option>
-                  ))}
-                </Field>
-                <ErrorMessage
-                  name="subCategory"
-                  component="div"
-                  className="text-red-500"
-                />
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-auto">
+            {/* Category select */}
+            <div className="mb-6">
+              <label
+                htmlFor="category"
+                className="block text-gray-700 text-sm font-semibold mb-2"
+              >
+                Product Category
+              </label>
+              <Field
+                as="select"
+                name="category"
+                id="category"
+                onChange={(e) => {
+                  setFieldValue("category", e.target.value); // Update Formik's 'category'
+                  setSelectedCategory(e.target.value); // Update 'selectedCategory' state
+                  setFieldValue("subCategory", ""); // Reset subcategory jika kategori berubah
+                }}
+                disabled={isLoading}
+                className="shadow appearance-none border rounded-md py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 w-60"
+              >
+                <option value="">Select a Category</option>
+                {categories.map((category) => (
+                  <option key={category._id} value={category._id}>
+                    {category.name}
+                  </option>
+                ))}
+              </Field>
+              <ErrorMessage
+                name="category"
+                component={"label"}
+                className="text-red-500"
+              />
             </div>
-          )}
+
+            {/* Subcategory select */}
+            <div className="mb-6">
+              <label
+                htmlFor="subCategory"
+                className="block text-gray-700 text-sm font-semibold mb-2"
+              >
+                Product Subcategory
+              </label>
+              <Field
+                as="select"
+                name="subCategory"
+                id="subCategory"
+                className="shadow appearance-none border rounded-md w-60 py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={selectedCategory === ""}
+              >
+                <option value="">Select a subcategory</option>
+                {subCategories.map((subCategory) => (
+                  <option key={subCategory._id} value={subCategory._id}>
+                    {subCategory.name.toUpperCase()}
+                  </option>
+                ))}
+              </Field>
+              <ErrorMessage
+                name="subCategory"
+                component="div"
+                className="text-red-500"
+              />
+            </div>
+          </div>
 
           {/* Conditional fields */}
           {values.variants.length === 0 && (
