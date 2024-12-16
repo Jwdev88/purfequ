@@ -88,14 +88,12 @@ const Collection = () => {
           <p className='mb-3 text-sm font-medium'>CATEGORIES</p>
           <div className='flex flex-col gap-2 textsm font-light text-gray-700'>
             <p className='flex gap-2'>
-              <input className='2-3' type="checkbox"  value={'men'}onChange={toggleCategory}/>Men      
+              <input className='2-3' type="checkbox"  value={'VaporBlasting'}onChange={toggleCategory}/>VaporBlasting      
             </p>
             <p className='flex gap-2'>
-              <input className='2-3' type="checkbox"  value={'women'}onChange={toggleCategory}/>Women      
+              <input className='2-3' type="checkbox"  value={'women'}onChange={toggleCategory}/>Sandblasting      
             </p>
-            <p className='flex gap-2'>
-              <input className='2-3' type="checkbox"  value={'kids'}onChange={toggleCategory}/>Kids      
-            </p>
+
           </div>
         </div>
               {/*Sub Category Filter */}
@@ -103,13 +101,10 @@ const Collection = () => {
           <p className='mb-3 text-sm font-medium'>TYPE</p>
           <div className='flex flex-col gap-2 textsm font-light text-gray-700'>
             <p className='flex gap-2'>
-              <input className='2-3' type="checkbox"  value={'Topwear'}onChange={toggleSubCategory}/>Topwear      
+              <input className='2-3' type="checkbox"  value={'Topwear'}onChange={toggleSubCategory}/>SubVaporBlasting    
             </p>
             <p className='flex gap-2'>
-              <input className='2-3' type="checkbox"  value={'Bottomwear'}onChange={toggleSubCategory}/>Bottomwear      
-            </p>
-            <p className='flex gap-2'>
-              <input className='2-3' type="checkbox"  value={'Winterwear'}onChange={toggleSubCategory}/>Winterwear   
+              <input className='2-3' type="checkbox"  value={'Bottomwear'}onChange={toggleSubCategory}/>SubSandBlasting      
             </p>
           </div>
         </div>

@@ -2,6 +2,8 @@ import { v2 as cloudinary } from "cloudinary";
 import Product from "../models/productModel.js";
 import mongoose from "mongoose";
 //create sukses
+
+
 const addProduct = async (req, res) => {
   try {
     const {
@@ -47,12 +49,8 @@ const addProduct = async (req, res) => {
         throw new Error("Variants must be an array");
       }
 
-      // Ensure at least one variant exists
-      if (parsedVariants.length === 0) {
-        throw new Error("At least one variant is required");
-      }
-
       // Validate each variant and its options
+      const skuSet = new Set();
       parsedVariants.forEach((variant, index) => {
         if (!variant.name || !Array.isArray(variant.options)) {
           throw new Error(`Invalid variant structure at index ${index}`);
@@ -69,6 +67,14 @@ const addProduct = async (req, res) => {
               `Invalid option structure in variant ${index}, option ${optIndex}`
             );
           }
+
+          // Check if variant SKU is unique
+          if (skuSet.has(option.sku)) {
+            throw new Error(
+              `Duplicate SKU found in variant ${index}, option ${optIndex}`
+            );
+          }
+          skuSet.add(option.sku);
         });
       });
     } catch (error) {
@@ -76,6 +82,25 @@ const addProduct = async (req, res) => {
         success: false,
         message: `Invalid variants data: ${error.message}`,
       });
+    }
+
+    // If no variants, ensure SKU is provided and unique
+    if (!parsedVariants.length) {
+      if (!sku) {
+        return res.status(400).json({
+          success: false,
+          message: "Path `sku` is required.",
+        });
+      }
+
+      // Check for SKU uniqueness
+      const existingProduct = await Product.findOne({ sku });
+      if (existingProduct) {
+        return res.status(400).json({
+          success: false,
+          message: "SKU produk sudah terdaftar.",
+        });
+      }
     }
 
     const productData = {
@@ -88,7 +113,7 @@ const addProduct = async (req, res) => {
       subCategory,
       bestSeller: bestSeller === "true",
       images: imagesURI,
-      sku,
+      sku: parsedVariants.length ? undefined : sku,
       variants: parsedVariants.map((variant) => ({
         name: variant.name,
         options: variant.options.map((option) => ({
@@ -113,23 +138,9 @@ const addProduct = async (req, res) => {
     } catch (error) {
       if (error.code === 11000) {
         console.log("Duplicate key error:", error);
-        if (error.keyPattern.sku) {
-          return res.status(400).json({
-            success: false,
-            message: "SKU produk sudah terdaftar.",
-          });
-        } else if (error.keyPattern["variants.options.sku"]) {
-          return res.status(400).json({
-            success: false,
-            message: "SKU varian sudah terdaftar.",
-          });
-        }
-      }
-
-      if (error.errors?.sku) {
         return res.status(400).json({
           success: false,
-          message: error.errors.sku.message,
+          message: "SKU produk sudah terdaftar.",
         });
       }
 
@@ -147,7 +158,8 @@ const addProduct = async (req, res) => {
     });
   }
 };
- 
+
+
 const getProducts = async (req, res) => {
   try {
     const products = await Product.find({})
@@ -157,14 +169,18 @@ const getProducts = async (req, res) => {
     res.status(200).json({ success: true, products });
   } catch (error) {
     console.error("Error retrieving products:", error);
-    res.status(500).json({ success: false, message: "Failed to load product data" });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to load product data" });
   }
 };
 const getProductById = async (req, res) => {
   try {
     const { Id } = req.params;
     if (!Id || !mongoose.Types.ObjectId.isValid(Id)) {
-      return res.status(400).json({ success: false, message: "Invalid product ID" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid product ID" });
     }
 
     const product = await Product.findById(Id)
@@ -172,7 +188,9 @@ const getProductById = async (req, res) => {
       .populate("variants.options");
 
     if (!product) {
-      return res.status(404).json({ success: false, message: "Product not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Product not found" });
     }
 
     res.json({ success: true, product });
@@ -181,24 +199,23 @@ const getProductById = async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
-const deleteProduct = async (req, res) => {
-  try {
-    const { id } = req.body;
-    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ success: false, message: "Invalid product ID" });
-    }
 
-    const deletedProduct = await Product.findByIdAndDelete(id);
-    if (!deletedProduct) {
+
+const deleteProduct = async (req, res) => {
+  const { productId } = req.body;
+  try {
+    // Assuming you have a Product model
+    const product = await Product.findByIdAndDelete(productId);
+    if (!product) {
       return res.status(404).json({ success: false, message: "Product not found" });
     }
-
-    res.status(200).json({ success: true, message: "Product successfully deleted" });
+    res.json({ success: true, message: "Product deleted successfully" });
   } catch (error) {
-    console.error("Error deleting product:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    res.status(500).json({ success: false, message: "Failed to delete product" });
   }
 };
+
+
 
 const editProduct = async (req, res) => {
   try {
@@ -217,13 +234,16 @@ const editProduct = async (req, res) => {
     } = req.body;
 
     if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
-      return res.status(400).json({ success: false, message: "Invalid productId" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid productId" });
     }
 
     // Parse and validate variants
     let parsedVariants;
     try {
-      parsedVariants = typeof variants === "string" ? JSON.parse(variants) : variants;
+      parsedVariants =
+        typeof variants === "string" ? JSON.parse(variants) : variants;
       if (!Array.isArray(parsedVariants) || parsedVariants.length === 0) {
         throw new Error("Variants must be a non-empty array");
       }
@@ -236,12 +256,17 @@ const editProduct = async (req, res) => {
           option.price = Number(option.price);
           option.weight = Number(option.weight);
           if (!option.name || isNaN(option.stock)) {
-            throw new Error(`Invalid option structure in variant ${index}, option ${optIndex}`);
+            throw new Error(
+              `Invalid option structure in variant ${index}, option ${optIndex}`
+            );
           }
         });
       });
     } catch (error) {
-      return res.status(400).json({ success: false, message: `Invalid variants data: ${error.message}` });
+      return res.status(400).json({
+        success: false,
+        message: `Invalid variants data: ${error.message}`,
+      });
     }
 
     const updatedData = {
@@ -257,23 +282,38 @@ const editProduct = async (req, res) => {
       variants: parsedVariants,
     };
 
-    const images = [req.files?.image1?.[0], req.files?.image2?.[0], req.files?.image3?.[0], req.files?.image4?.[0]].filter(Boolean);
+    const images = [
+      req.files?.image1?.[0],
+      req.files?.image2?.[0],
+      req.files?.image3?.[0],
+      req.files?.image4?.[0],
+    ].filter(Boolean);
     if (images.length > 0) {
       const imagesURI = await Promise.all(
         images.map(async (item) => {
-          const result = await cloudinary.uploader.upload(item.path, { resource_type: "image" });
+          const result = await cloudinary.uploader.upload(item.path, {
+            resource_type: "image",
+          });
           return result.secure_url;
         })
       );
       updatedData.images = imagesURI;
     }
 
-    const product = await Product.findByIdAndUpdate(productId, updatedData, { new: true });
+    const product = await Product.findByIdAndUpdate(productId, updatedData, {
+      new: true,
+    });
     if (!product) {
-      return res.status(404).json({ success: false, message: "Product not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Product not found" });
     }
 
-    res.json({ success: true, message: "Product updated successfully", product });
+    res.json({
+      success: true,
+      message: "Product updated successfully",
+      product,
+    });
   } catch (error) {
     console.error("Error updating product:", error);
     res.status(500).json({ success: false, message: "Server error" });
@@ -281,82 +321,3 @@ const editProduct = async (req, res) => {
 };
 
 export { addProduct, getProducts, getProductById, deleteProduct, editProduct };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

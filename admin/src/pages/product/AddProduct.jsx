@@ -13,9 +13,9 @@ import {
   Icon,
   Text,
   FormErrorMessage,
+  Checkbox,
 } from "@chakra-ui/react";
 import axios from "axios";
-import ProductVariants from "./ProductVarian";
 import { backendURI } from "../../App";
 import { assets } from "../../assets/assets";
 
@@ -29,110 +29,144 @@ const AddProduct = ({ token }) => {
     weight: "",
     category: "",
     subCategory: "",
-    bestSeller: false, // Add bestSeller state
+    bestSeller: false,
   });
   const [variants, setVariants] = useState([]);
   const [categories, setCategories] = useState([]);
   const [subCategories, setSubCategories] = useState([]);
   const [uploadedImages, setUploadedImages] = useState([]);
-  const [imageErrors, setImageErrors] = useState([]); // Track image errors
+  const [imageErrors, setImageErrors] = useState([]);
+  const [productId, setProductId] = useState(null);
+  const [hasVariants, setHasVariants] = useState(false);
   const toast = useToast();
 
+  const fetchCategories = async () => {
+    try {
+      const response = await axios.get(`${backendURI}/api/category/list`, {
+        headers: { token },
+      });
+      setCategories(response.data.categories || []);
+    } catch (error) {
+      handleError("Gagal mengambil kategori");
+    }
+  };
+
+  const fetchSubCategories = async (category) => {
+    try {
+      const response = await axios.get(`${backendURI}/api/subcategory/list`, {
+        headers: { token },
+        params: { category },
+      });
+      setSubCategories(response.data.subCategories || []);
+    } catch (error) {
+      handleError("Gagal mengambil subkategori");
+    }
+  };
+
+  const handleError = (message) => {
+    console.error(message);
+    toast({
+      title: "Error",
+      description: message,
+      status: "error",
+      duration: 5000,
+      isClosable: true,
+    });
+  };
+
   useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const response = await axios.get(`${backendURI}/api/category/list`, {
-          headers: { token },
-        });
-        setCategories(response.data.categories || []);
-      } catch (error) {
-        console.error("Error fetching categories:", error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch categories",
-          status: "error",
-          duration: 5000,
-          isClosable: true,
-        });
-      }
-    };
     fetchCategories();
   }, [token]);
 
   useEffect(() => {
-    if (!productDetails.category) return;
-
-    const fetchSubCategories = async () => {
-      try {
-        const response = await axios.get(`${backendURI}/api/subcategory/list`, {
-          headers: { token },
-          params: { category: productDetails.category },
-        });
-        setSubCategories(response.data.subCategories || []);
-      } catch (error) {
-        console.error("Error fetching subcategories:", error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch subcategories",
-          status: "error",
-          duration: 5000,
-          isClosable: true,
-        });
-      }
-    };
-
-    fetchSubCategories();
+    if (productDetails.category) {
+      fetchSubCategories(productDetails.category);
+    }
   }, [productDetails.category, token]);
 
   const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target; // Handle checkboxes
+    const { name, value, type, checked } = e.target;
     setProductDetails((prevDetails) => ({
       ...prevDetails,
       [name]: type === "checkbox" ? checked : value,
     }));
   };
 
+  const handleVariantsCheckboxChange = (e) => {
+    const isChecked = e.target.checked;
+    setHasVariants(isChecked);
+    if (!isChecked) {
+      setVariants([]); // Clear variants if the checkbox is unchecked
+    }
+  };
+
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
-    const newImageErrors = []; // Reset errors for new selection
+    const newImageErrors = [];
 
     const newImages = files
       .map((file, index) => {
         if (file.size > 5 * 1024 * 1024) {
-          // 5MB limit
-          newImageErrors[index] = "Image size must be less than 5MB";
-          return null; // Skip invalid files
+          newImageErrors[index] = "Ukuran gambar harus kurang dari 5MB";
+          return null;
         }
         return { file, preview: URL.createObjectURL(file) };
       })
-      .filter(Boolean); // Remove null entries
+      .filter(Boolean);
 
     setImageErrors(newImageErrors);
     setUploadedImages((prevImages) => [...prevImages, ...newImages]);
   };
 
+  const validateVariants = () => {
+    for (const variant of variants) {
+      if (!variant.name) {
+        toast({
+          title: "Validation Error",
+          description: "Each variant must have a name.",
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+        });
+        return false;
+      }
+      for (const option of variant.options) {
+        if (
+          !option.name ||
+          option.stock < 0 ||
+          option.price < 0 ||
+          !option.sku ||
+          option.weight < 0
+        ) {
+          toast({
+            title: "Validation Error",
+            description:
+              "Each option must have valid name, stock, price, SKU, and weight.",
+            status: "error",
+            duration: 5000,
+            isClosable: true,
+          });
+          return false;
+        }
+      }
+    }
+    return true;
+  };
+
   const validateSubmission = () => {
     const errors = {};
-    if (!productDetails.name) errors.name = "Product name is required.";
-    if (!productDetails.category) errors.category = "Category is required.";
+    if (!productDetails.name) errors.name = "Nama produk diperlukan.";
+    if (!productDetails.category) errors.category = "Kategori diperlukan.";
     if (!uploadedImages.length)
-      errors.images = "At least one product image is required.";
-    if (!variants.length) {
-      if (
-        !productDetails.sku ||
-        !productDetails.price ||
-        !productDetails.stock ||
-        !productDetails.weight
-      ) {
-        errors.variants =
-          "Either variants or product SKU, price, stock, and weight must be provided.";
-      }
+      errors.images = "Setidaknya satu gambar produk diperlukan.";
+    if (!variants.length && hasVariants) {
+      errors.variants = "Varian harus ditambahkan jika produk memiliki varian.";
     }
 
     if (Object.keys(errors).length) {
       Object.values(errors).forEach((error) =>
         toast({
-          title: "Validation Error",
+          title: "Kesalahan Validasi",
           description: error,
           status: "error",
           duration: 5000,
@@ -146,7 +180,7 @@ const AddProduct = ({ token }) => {
 
   const onSubmitHandler = async (e) => {
     e.preventDefault();
-
+    if (!validateVariants()) return;
     if (!validateSubmission()) return;
 
     try {
@@ -155,78 +189,99 @@ const AddProduct = ({ token }) => {
         formData.append(key, productDetails[key])
       );
       uploadedImages.forEach((image, index) => {
-        formData.append(`image${index + 1}`, image.file); // Correct field names: image1, image2, etc.
+        formData.append(`image${index + 1}`, image.file);
       });
 
-      formData.append(
-        "variants",
-        JSON.stringify(
-          variants.length
-            ? variants
-            : [
-                {
-                  name: "Default",
-                  options: [
-                    {
-                      name: "Standard",
-                      stock: productDetails.stock,
-                      price: productDetails.price,
-                      sku: productDetails.sku,
-                      weight: productDetails.weight,
-                    },
-                  ],
-                },
-              ]
-        )
-      );
+      if (Array.isArray(variants) && variants.length > 0) {
+        formData.append("variants", JSON.stringify(variants));
+      }
 
       const response = await axios.post(
         `${backendURI}/api/product/add`,
         formData,
-        { headers: { token } }
+        {
+          headers: {
+            token,
+            "Content-Type": "multipart/form-data",
+          },
+        }
       );
 
-      if (response.data.success) {
+      if (response.data.success && response.data.productId) {
+        setProductId(response.data.productId);
         toast({
-          title: "Success",
+          title: "Sukses",
           description: response.data.message,
           status: "success",
           duration: 5000,
           isClosable: true,
         });
-        // Reset form after successful submission
-        setProductDetails({
-          name: "",
-          description: "",
-          price: "",
-          stock: "",
-          sku: "",
-          weight: "",
-          category: "",
-          subCategory: "",
-          bestSeller: false,
-        });
-        setVariants([]);
-        setUploadedImages([]);
+        resetForm();
       } else {
         throw new Error(response.data.message);
       }
     } catch (error) {
-      console.error("Error submitting product:", error);
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || error.message,
-        status: "error",
-        duration: 5000,
-        isClosable: true,
-      });
+      handleError(error.response?.data?.message || error.message);
     }
+  };
+
+  const resetForm = () => {
+    setProductDetails({
+      name: "",
+      description: "",
+      price: "",
+      stock: "",
+      sku: "",
+      weight: "",
+      category: "",
+      subCategory: "",
+      bestSeller: false,
+    });
+    setVariants([]);
+    setUploadedImages([]);
+    setImageErrors([]);
+    setHasVariants(false);
+  };
+
+  const addVariant = () => {
+    setVariants([...variants, { name: "", options: [] }]);
+  };
+
+  const addOptionToVariant = (variantIndex) => {
+    const newVariants = [...variants];
+    newVariants[variantIndex].options.push({
+      name: "",
+      stock: 0,
+      price: 0,
+      sku: "",
+      weight: 0,
+    });
+    setVariants(newVariants);
+  };
+
+  const handleVariantChange = (index, field, value) => {
+    const newVariants = [...variants];
+    newVariants[index][field] = value;
+    setVariants(newVariants);
+  };
+
+  const handleOptionChange = (variantIndex, optionIndex, field, value) => {
+    const newVariants = [...variants];
+    newVariants[variantIndex].options[optionIndex][field] = value;
+    setVariants(newVariants);
+  };
+
+  const removeVariant = (index) => {
+    setVariants(variants.filter((_, i) => i !== index));
   };
 
   return (
     <Box as="form" onSubmit={onSubmitHandler}>
-      {/* Image Upload Section */}
       <FormControl mb={4} isInvalid={imageErrors.some(Boolean)}>
+        {/* Add Product Detail */}
+        <Text fontSize="xl" fontWeight="bold" mb={2}>
+          Add Detail Produk
+        </Text>
         <FormLabel>Upload Images</FormLabel>
         <Flex gap={4}>
           {uploadedImages.map((image, index) => (
@@ -266,19 +321,16 @@ const AddProduct = ({ token }) => {
                 hidden
                 onChange={handleImageChange}
                 accept="image/*"
-              />{" "}
-              {/* Accept only images */}
+              />
             </label>
           </Box>
         </Flex>
         {imageErrors.some(Boolean) && (
           <FormErrorMessage>
-            Some images have errors. Please check.
+            Beberapa gambar memiliki kesalahan. Silakan periksa.
           </FormErrorMessage>
         )}
       </FormControl>
-
-      {/* Product Details Section */}
       <FormControl mb={4}>
         <FormLabel>Product Name</FormLabel>
         <Input
@@ -305,7 +357,7 @@ const AddProduct = ({ token }) => {
           value={productDetails.price}
           onChange={handleInputChange}
           placeholder="Product Price"
-          isDisabled={variants.length > 0}
+          isDisabled={hasVariants}
         />
       </FormControl>
       <FormControl mb={4}>
@@ -316,10 +368,30 @@ const AddProduct = ({ token }) => {
           value={productDetails.stock}
           onChange={handleInputChange}
           placeholder="Product Stock"
-          isDisabled={variants.length > 0}
+          isDisabled={hasVariants}
         />
       </FormControl>
-      {/* Category and Subcategory */}
+      <FormControl mb={4}>
+        <FormLabel>Product SKU</FormLabel>
+        <Input
+          name="sku"
+          value={productDetails.sku}
+          onChange={handleInputChange}
+          placeholder="Product SKU"
+          isDisabled={hasVariants}
+        />
+      </FormControl>
+      <FormControl mb={4}>
+        <FormLabel>Product Weight</FormLabel>
+        <Input
+          name="weight"
+          type="number"
+          value={productDetails.weight}
+          onChange={handleInputChange}
+          placeholder="Product Weight (in kg)"
+          isDisabled={hasVariants}
+        />
+      </FormControl>
       <FormControl mb={4}>
         <FormLabel>Category</FormLabel>
         <Select
@@ -334,28 +406,6 @@ const AddProduct = ({ token }) => {
             </option>
           ))}
         </Select>
-      </FormControl>
-
-      <FormControl mb={4}>
-        <FormLabel>Product SKU</FormLabel>
-        <Input
-          name="sku"
-          value={productDetails.sku}
-          onChange={handleInputChange}
-          placeholder="Product SKU"
-          isDisabled={variants.length > 0} // Disable when variants are present
-        />
-      </FormControl>
-      <FormControl mb={4}>
-        <FormLabel>Product Weight</FormLabel>
-        <Input
-          name="weight"
-          type="number"
-          value={productDetails.weight}
-          onChange={handleInputChange}
-          placeholder="Product Weight (in kg)"
-          isDisabled={variants.length > 0} // Disable when variants are present
-        />
       </FormControl>
       <FormControl mb={4}>
         <FormLabel>Subcategory</FormLabel>
@@ -374,16 +424,125 @@ const AddProduct = ({ token }) => {
         </Select>
       </FormControl>
       <FormControl mb={4}>
-        <FormLabel>Best Seller</FormLabel>
-        <Input
-          type="checkbox"
+        <Checkbox
           name="bestSeller"
-          checked={productDetails.bestSeller}
+          isChecked={productDetails.bestSeller}
           onChange={handleInputChange}
-        />
+        >
+          Best Seller
+        </Checkbox>
       </FormControl>
-      {/* Variants Section */}
-      <ProductVariants variants={variants} setVariants={setVariants} />
+
+      <FormControl mb={4}>
+        <Checkbox
+          name="hasVariants"
+          isChecked={hasVariants}
+          onChange={handleVariantsCheckboxChange}
+        >
+          Apakah Produk Memiliki Varian?
+        </Checkbox>
+      </FormControl>
+
+      {hasVariants && (
+        <Box mb={4}>
+          <Button onClick={addVariant} colorScheme="teal" mb={2}>
+            Add Variant
+          </Button>
+          {variants.map((variant, variantIndex) => (
+            <Box key={variantIndex} mb={4}>
+              <FormControl mb={2}>
+                <FormLabel>Variant Name</FormLabel>
+                <Input
+                  value={variant.name}
+                  onChange={(e) =>
+                    handleVariantChange(variantIndex, "name", e.target.value)
+                  }
+                />
+              </FormControl>
+              <Button
+                onClick={() => addOptionToVariant(variantIndex)}
+                colorScheme="teal"
+                mb={2}
+              >
+                Add Option
+              </Button>
+              {variant.options.map((option, optionIndex) => (
+                <Flex key={optionIndex} mb={2}>
+                  <Input
+                    placeholder="Option Name"
+                    value={option.name}
+                    onChange={(e) =>
+                      handleOptionChange(
+                        variantIndex,
+                        optionIndex,
+                        "name",
+                        e.target.value
+                      )
+                    }
+                    mr={2}
+                  />
+                  <Input
+                    placeholder="Stock"
+                    type="number"
+                    value={option.stock}
+                    onChange={(e) =>
+                      handleOptionChange(
+                        variantIndex,
+                        optionIndex,
+                        "stock",
+                        parseInt(e.target.value, 10)
+                      )
+                    }
+                    mr={2}
+                  />
+                  <Input
+                    placeholder="Price"
+                    type="number"
+                    value={option.price}
+                    onChange={(e) =>
+                      handleOptionChange(
+                        variantIndex,
+                        optionIndex,
+                        "price",
+                        parseFloat(e.target.value)
+                      )
+                    }
+                    mr={2}
+                  />
+                  <Input
+                    placeholder="SKU"
+                    value={option.sku}
+                    onChange={(e) =>
+                      handleOptionChange(
+                        variantIndex,
+                        optionIndex,
+                        "sku",
+                        e.target.value
+                      )
+                    }
+                    mr={2}
+                  />
+                  <Input
+                    placeholder="Weight"
+                    type="number"
+                    value={option.weight}
+                    onChange={(e) =>
+                      handleOptionChange(
+                        variantIndex,
+                        optionIndex,
+                        "weight",
+                        parseFloat(e.target.value)
+                      )
+                    }
+                    mr={2}
+                  />
+                </Flex>
+              ))}
+            </Box>
+          ))}
+        </Box>
+      )}
+
       <Button type="submit" colorScheme="blue" mt={4}>
         Add Product
       </Button>

@@ -7,7 +7,6 @@ import {
   Heading,
   Input,
   InputGroup,
-  InputLeftElement,
   InputRightElement,
   Select,
   Spinner,
@@ -17,8 +16,9 @@ import {
 import { toast } from "react-toastify";
 import { SearchIcon, AddIcon } from "@chakra-ui/icons";
 import { ProductCard } from "./ProductCard";
-import { backendURI } from "../../App"; // Ensure this is correctly set up
+import { backendURI } from "../../App";
 import ProductPagination from "../../ProductPagination";
+
 const ProductList = ({ token }) => {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -28,13 +28,9 @@ const ProductList = ({ token }) => {
   const [filterSubCategory, setFilterSubCategory] = useState("");
   const [sortPrice, setSortPrice] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-
-  // ... existing state variables ...
   const [currentPage, setCurrentPage] = useState(1);
-  const [productsPerPage] = useState(10); // You can adjust this number as needed
+  const [productsPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(0);
-
-  // ... rest of the component ...
 
   const fetchData = async () => {
     try {
@@ -99,24 +95,32 @@ const ProductList = ({ token }) => {
       : filteredProducts;
   }, [filteredProducts, sortPrice]);
 
-  const handleDelete = useCallback(
-    async (id) => {
-      try {
-        await axios.delete(`${backendURI}/api/product/delete`, {
-          headers: { token },
-          data: { id },
-        });
-        setProducts((prev) => prev.filter((product) => product._id !== id));
+ const handleDelete = useCallback(
+  async (productId) => {
+    try {
+      const response = await axios.post(
+        `${backendURI}/api/product/delete`,
+        { productId }, // Ensure productId is sent in the body
+        {
+          headers: { token }, // Ensure token is included for authentication
+        }
+      );
+      if (response.data.success) {
+        setProducts((prev) => prev.filter((product) => product._id !== productId));
         toast.success("Product deleted successfully");
-      } catch (error) {
-        toast.error(`Error deleting product: ${error.message}`);
+      } else {
+        toast.error(response.data.message || "Failed to delete product");
       }
-    },
-    [token]
-  );
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      toast.error(`Error deleting product: ${error.response?.data?.message || error.message}`);
+    }
+  },
+  [token]
+);
 
   const handleEdit = useCallback((id) => {
-    window.location.href = `/product/edit/${id}`;
+    window.open(`/product/edit/${id}`, "_self");
   }, []);
 
   const handleAddProduct = useCallback(() => {
@@ -142,7 +146,6 @@ const ProductList = ({ token }) => {
         </Button>
       </Flex>
 
-      {/* Search and Filters */}
       <Stack spacing={10} mb={8}>
         <InputGroup>
           <InputRightElement pointerEvents="none">
@@ -173,7 +176,7 @@ const ProductList = ({ token }) => {
             isDisabled={!filterCategory}
           >
             {subCategories
-              .filter((sub) => sub.category._id === filterCategory)
+              .filter((sub) => sub.category?._id === filterCategory)
               .map((sub) => (
                 <option key={sub._id} value={sub._id}>
                   {sub.name}
@@ -191,7 +194,6 @@ const ProductList = ({ token }) => {
         </Flex>
       </Stack>
 
-      {/* Product List */}
       {isLoading ? (
         <Flex justify="center" align="center" h="200px">
           <Spinner size="lg" />
@@ -207,7 +209,7 @@ const ProductList = ({ token }) => {
               key={product._id}
               product={product}
               onEdit={handleEdit}
-              onDelete={handleDelete}
+              onDelete={() => handleDelete(product._id)}
             />
           ))}
           <ProductPagination

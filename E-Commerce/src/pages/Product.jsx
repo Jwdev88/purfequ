@@ -1,10 +1,11 @@
 import React, { useContext, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { ShopContext } from "../context/ShopContext"; // Import ShopContext untuk cart
+import { ShopContext } from "../context/ShopContext";
 import RelatedProducts from "../components/RelatedProducts";
 import { Stars } from "lucide-react";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+
 const Product = () => {
   const { productId } = useParams();
   const { products, addToCart, formatIDR } = useContext(ShopContext);
@@ -12,24 +13,23 @@ const Product = () => {
   const [image, setImage] = useState("");
   const [selectedVariants, setSelectedVariants] = useState({});
   const [isLoading, setIsLoading] = useState(true);
+
   useEffect(() => {
-    // Initialize selectedVariants if not defined
     if (
       productData?.variants?.length > 0 &&
       Object.keys(selectedVariants).length === 0
     ) {
       const initialVariants = {};
       productData.variants.forEach((variant) => {
-        initialVariants[variant.name] = variant.options[0].name; // Set to the first option by default
+        initialVariants[variant.name] = variant.options[0].name;
       });
       setSelectedVariants(initialVariants);
     }
   }, [productData, selectedVariants]);
-  
 
   const getVariantPrice = () => {
     if (!productData || !productData.variants || productData.variants.length === 0) {
-      return productData?.price || 0; // Handle kasus jika tidak ada varian
+      return productData?.price || 0;
     }
 
     let variantPrice = productData.price;
@@ -40,7 +40,7 @@ const Product = () => {
         const optionData = variant.options.find(option => option.name === selectedOption);
         if (optionData && optionData.price !== undefined) {
           variantPrice = optionData.price;
-          break; // harga sudah ketemu, stop looping
+          break;
         }
       }
     }
@@ -48,9 +48,7 @@ const Product = () => {
     return variantPrice;
   };
 
-
   useEffect(() => {
-    // Cari produk berdasarkan productId
     const foundProduct = products.find((item) => item._id === productId);
     if (foundProduct) {
       setProductData(foundProduct);
@@ -77,78 +75,52 @@ const Product = () => {
     );
   }
 
- 
- 
   const getSelectedVariantId = () => {
     const matchingVariant = productData.variants.find((variant) => {
       const selectedOptionName = selectedVariants[variant.name];
       return selectedOptionName && variant.options.some((option) => option.name === selectedOptionName);
     });
-  
+
     if (!matchingVariant) {
       toast.error("Please select valid options for all variants.");
     }
-  
+
     return matchingVariant?._id;
   };
-  
+
   const handleAddToCart = () => {
     if (
       productData?.variants?.length > 0 &&
       Object.keys(selectedVariants).length !== productData.variants.length
     ) {
-      toast.error("Silahkan pilih semua varian.");
+      toast.error("Please select all variant options.");
       return;
     }
-  
+
     const selectedVariantId = getSelectedVariantId();
     if (!selectedVariantId) {
       toast.error("Please select valid options for all variants.");
       return;
     }
-  
+
     addToCart(productData._id, selectedVariantId);
-    toast.success(`"${productData.name}" telah ditambahkan ke keranjang`);
+    toast.success(`"${productData.name}" has been added to the cart.`);
   };
-  
-
-
 
   const handleVariantChange = (variantName, selectedOptionName) => {
     setSelectedVariants({ ...selectedVariants, [variantName]: selectedOptionName });
-    
+
     const selectedVariant = productData.variants.find(
       (variant) => variant.name === variantName
     );
     const selectedOption = selectedVariant?.options.find(
       (option) => option.name === selectedOptionName
     );
-  
+
     if (selectedOption?.image) {
       setImage(selectedOption.image);
     }
   };
-  
-
-
- 
-
-        
-            
-  
-    
-   
-  
-
-   
-   
-  
-  
-   
-   
-   
-  
-
 
   return (
     <div className="border-t-2 pt-10 transition-opacity ease-in duration-500 opacity-100">
@@ -166,8 +138,7 @@ const Product = () => {
             ))}
           </div>
           <div className="w-full sm:w-[80%]">
-            <img className="w-full h-auto" src={image} alt={productData.name} />{" "}
-            {/* Alt tag penting untuk SEO */}
+            <img className="w-full h-auto" src={image} alt={productData.name} />
           </div>
         </div>
 
@@ -176,7 +147,6 @@ const Product = () => {
             {productData.name}
           </h1>
 
-          {/* ... (rating stars - jika ada) */}
           <div className="mt-4 flex items-center">
             {Array.from({ length: 5 }).map((_, i) => (
               <Stars
@@ -193,18 +163,14 @@ const Product = () => {
                 strokeLinejoin="round"
               />
             ))}
-            <span className="ml-2 text-xl font-semibold text-gray-700">
-             
-             
-            </span>
+            <span className="ml-2 text-xl font-semibold text-gray-700"></span>
           </div>
-          <p className="mt-2 text-sm font-medium">Product Rating : {productData.rating.toFixed(1)} </p>
+          <p className="mt-2 text-sm font-medium">Product Rating: {productData.rating.toFixed(1)}</p>
           <p className="mt-2 text-2xl font-medium">{formatIDR(getVariantPrice())}</p>
 
-
           <p className="mt-2 text-sm font-medium">
-            <span className="font-semibold">Kategori: </span>{" "}
-            {productData.category.name} {/* Akses nama kategori */}
+            <span className="font-semibold">Kategori: </span>
+            {productData.category.name}
           </p>
           <p className="mt-3 text-gray-500 md:w-4/5">
             {productData.description}
@@ -246,17 +212,14 @@ const Product = () => {
               TAMBAH KE KERANJANG
             </button>
           </div>
-          {/* ... (deskripsi dan review) */}
         </div>
       </div>
       <RelatedProducts
         category={productData.category.name}
         subCategory={productData.subCategory.name}
       />
-      {/* Akses nama kategori dan subkategori */}
     </div>
   );
 };
 
 export default Product;
-

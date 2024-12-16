@@ -50,7 +50,38 @@ const ShopContextProvider = (props) => {
       fetchProvinces();
     }
   }, []);
-
+  const ProductDetail = ({ productData }) => {
+    if (!productData) {
+      return <div>Loading...</div>; // or handle the error appropriately
+    }
+    
+  useEffect(() => {
+    // Fetch products from API or local data
+    fetchProducts().then((data) => setProducts(data));
+  }, []);
+  const Cart = ({ product }) => {
+    if (!product || !product.variants) {
+      return <div>Product data is not available</div>;
+    }
+  
+    return (
+      <div>
+        {/* Render product variants */}
+        {product.variants.map((variant) => (
+          <div key={variant.name}>{variant.name}</div>
+        ))}
+      </div>
+    );
+  };
+  
+    // Proceed with rendering once productData is available
+    return (
+      <div>
+        <h1>{productData.name}</h1>
+        {/* Other product details */}
+      </div>
+    );
+  };
   //use effect untuk mengambil data kota
   const fetchCities = async (provinceId) => {
     try {
@@ -116,7 +147,7 @@ const ShopContextProvider = (props) => {
     // Proceed with adding to cart
     try {
       const response = await axios.post(
-        backendUrl + "/api/cart/add",
+        `${backendUrl}/api/cart/add`,
         { itemId, variantName, variantOption },
         { headers: { token } }
       );
@@ -143,7 +174,6 @@ const ShopContextProvider = (props) => {
       toast.error("An unexpected error occurred. Please try again.");
     }
   };
-  
 
 
   //function untuk menghapus item di cart
@@ -165,29 +195,43 @@ const ShopContextProvider = (props) => {
   };
 
   //function untuk menghitung total harga
-  const getCartAmount = () => {
-    let totalAmount = 0;
-    for (const itemId in cartItems) {
-      const itemInfo = products.find((product) => product._id === itemId);
-      for (const variantName in cartItems[itemId]) {
-        for (const variantOption in cartItems[itemId][variantName]) {
-          try {
-            if (cartItems[itemId][variantName][variantOption] > 0) {
-              const variant = itemInfo.variants.find(
-                (v) => v.name === variantName
-              );
-              const option = variant.options.find(
-                (o) => o.name === variantOption
-              );
-              totalAmount +=
-                option.price * cartItems[itemId][variantName][variantOption];
-            }
-          } catch (error) {}
+const getCartAmount = () => {
+  let totalAmount = 0;
+
+  for (const itemId in cartItems) {
+    const itemInfo = products.find((product) => product._id === itemId);
+
+    if (!itemInfo) {
+      console.warn(`Product with ID ${itemId} not found.`);
+      continue;
+    }
+
+    for (const variantName in cartItems[itemId]) {
+      const variant = itemInfo.variants.find((v) => v.name === variantName);
+
+      if (!variant) {
+        console.warn(`Variant "${variantName}" not found for product ID ${itemId}.`);
+        continue;
+      }
+
+      for (const variantOption in cartItems[itemId][variantName]) {
+        const option = variant.options.find((o) => o.name === variantOption);
+
+        if (!option) {
+          console.warn(`Option "${variantOption}" not found for variant "${variantName}".`);
+          continue;
+        }
+
+        const quantity = cartItems[itemId][variantName][variantOption];
+        if (quantity > 0) {
+          totalAmount += option.price * quantity;
         }
       }
     }
-    return totalAmount;
-  };
+  }
+
+  return totalAmount;
+};
 
   //function untuk mengambil data produk
 

@@ -48,33 +48,18 @@ async function uploadImageToCloudinary(imageFile) {
 const getSubCategories = async (req, res) => {
   try {
     const categoryId = req.query.category;
+
+    // Validate category ID format
+    if (categoryId && !mongoose.Types.ObjectId.isValid(categoryId)) {
+      return res.status(400).json({ success: false, message: "Invalid Category ID format." });
+    }
+
     const subCategories = await SubCategory.find({ category: categoryId }).populate("category");
 
-    const subCategoriesWithImageData = await Promise.all(
-      subCategories.map(async (subCategory) => {
-        let imageData = [];
-        if (typeof subCategory.image === "string") {
-          const publicId = subCategory.image.split("/").pop().split(".")[0];
-          try {
-            const cloudinaryData = await cloudinary.api.resource(publicId);
-            imageData = [cloudinaryData];
-          } catch (cloudinaryError) {
-            console.error("Cloudinary error:", cloudinaryError);
-            imageData = [];
-          }
-        }
-
-        return {
-          ...subCategory.toObject(),
-          imageData,
-        };
-      })
-    );
-
-    res.status(200).json({ success: true, subCategories: subCategoriesWithImageData });
+    res.status(200).json({ success: true, subCategories });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Error fetching subcategories:", error);
+    res.status(500).json({ success: false, message: "Internal server error." });
   }
 };
 

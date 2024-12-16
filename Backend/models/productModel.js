@@ -1,5 +1,18 @@
 import mongoose from "mongoose";
 
+const variantOptionSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  stock: { type: Number, required: true, min: 0 },
+  price: { type: Number, required: true, min: 0 },
+  sku: { type: String, required: true, unique: true },
+  weight: { type: Number, required: true, min: 0 },
+});
+
+const variantSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  options: [variantOptionSchema],
+});
+
 const productSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, maxlength: 255 },
@@ -8,57 +21,49 @@ const productSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Category",
       required: true,
+      index: true,
     },
     subCategory: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "SubCategory",
       required: true,
+      index: true,
     },
-    price: { type: Number, required: true, min: 0 }, // Price must be non-negative
-    discount: { type: Number, default: 0, min: 0, max: 100 }, // Percent discount
-    stock: { type: Number, required: true, min: 0 }, // Ensure stock is non-negative
-    weight: { type: Number, required: true, min: 0 }, // Weight must be in grams
-    minOrder: { type: Number, default: 1, min: 1 }, // Minimum quantity to order
+    price: { type: Number, required: true, min: 0 },
+    discount: { type: Number, default: 0, min: 0, max: 100 },
+    stock: { type: Number, required: true, min: 0 },
+    weight: { type: Number, required: true, min: 0 },
+    minOrder: { type: Number, default: 1, min: 1 },
     images: [
-      { type: String, required: true, validate: /\bhttps?:\/\/\S+\b/ }, // Validate URL format
+      {
+        type: String,
+        required: true,
+        validate: {
+          validator: function (v) {
+            return /^https?:\/\/.+\.(jpg|jpeg|png|webp|avif|gif|svg)$/.test(v);
+          },
+          message: (props) => `${props.value} is not a valid image URL!`,
+        },
+      },
     ],
     sku: {
       type: String,
-      required: true,
       unique: true,
       trim: true,
       uppercase: true,
-    },
-    variants: [
-      {
-        name: { type: String, required: true }, // e.g., "Color"
-        options: [
-          {
-            name: { type: String, required: true }, // e.g., "Red"
-            stock: { type: Number, required: true, min: 0 },
-            price: { type: Number, required: true, min: 0 },
-            sku: { type: String, required: true, unique: true },
-            // image: { type: String, validate: }, // Optional image
-            weight: { type: Number, required: true, min: 0 },
-          },
-        ],
+      index: true,
+      required: function () {
+        return this.variants.length === 0;
       },
-    ],
+    },
+    variants: [variantSchema],
     bestSeller: { type: Boolean, default: false },
-    rating: { type: Number, default: 5, min: 0, max: 5 }, // Min/max constraints
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now },
+    rating: { type: Number, default: 5, min: 0, max: 5 },
   },
   {
-    timestamps: true, // Automatically handles createdAt and updatedAt
+    timestamps: true,
   }
 );
-
-// Automatically update `updatedAt` timestamp
-productSchema.pre("save", function (next) {
-  this.updatedAt = Date.now();
-  next();
-});
 
 // Export the model
 const Product = mongoose.models.product || mongoose.model("product", productSchema);

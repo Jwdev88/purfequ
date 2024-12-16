@@ -8,11 +8,11 @@ const handleError = (res, error, message = "An error occurred", status = 500) =>
 };
 
 // Validation schema using Joi
-const validateCartInput = (data) => {
+const validateCartInput = (data, requireVariant = false) => {
   const schema = Joi.object({
     userId: Joi.string().required(),
     productId: Joi.string().optional(),
-    variantId: Joi.string().optional(),
+    variantId: requireVariant ? Joi.string().required() : Joi.string().optional(),
     quantity: Joi.number().integer().min(1).optional(),
   });
   return schema.validate(data);
@@ -45,8 +45,9 @@ export const addToCart = async (req, res) => {
     const { userId, productId, variantId, quantity = 1 } = req.body;
 
     // Validate input
-    const { error } = validateCartInput({ userId, productId, variantId, quantity });
-    if (error) return res.status(400).json({ success: false, message: error.details[0].message });
+    if (!productId || !variantId) {
+      return res.status(400).json({ success: false, message: "Product and variant must be selected." });
+    }
 
     const user = await userModel.findById(userId);
 
@@ -70,7 +71,8 @@ export const addToCart = async (req, res) => {
     await user.save();
     res.json({ success: true, message: "Item added to cart", cartData: user.cartData });
   } catch (error) {
-    handleError(res, error, "Failed to add item to cart");
+    console.error("Failed to add item to cart", error);
+    res.status(500).json({ success: false, message: "Failed to add item to cart" });
   }
 };
 
@@ -80,7 +82,7 @@ export const updateCart = async (req, res) => {
     const { userId, productId, variantId, quantity } = req.body;
 
     // Validate input
-    const { error } = validateCartInput({ userId, productId, variantId, quantity });
+    const { error } = validateCartInput({ userId, productId, variantId, quantity }, true);
     if (error) return res.status(400).json({ success: false, message: error.details[0].message });
 
     const user = await userModel.findById(userId);
@@ -113,7 +115,7 @@ export const removeFromCart = async (req, res) => {
     const { userId, productId, variantId } = req.body;
 
     // Validate input
-    const { error } = validateCartInput({ userId, productId, variantId });
+    const { error } = validateCartInput({ userId, productId, variantId }, true);
     if (error) return res.status(400).json({ success: false, message: error.details[0].message });
 
     const user = await userModel.findById(userId);
