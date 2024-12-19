@@ -5,7 +5,7 @@ import { toast } from "react-toastify";
 import { Plus, Search, Filter, Pencil, Trash } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 
-const ListsubCategory = () => {
+const ListsubCategory = (token) => {
   const [subcategories, setSubCategories] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -17,7 +17,9 @@ const ListsubCategory = () => {
   const fetchSubCategories = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get(`${backendURI}/api/subcategory/list`);
+      const response = await axios.get(`${backendURI}/api/subcategory/list`,{
+        headers: { token },
+      });
       if (response.data.success) {
         setSubCategories(response.data.subCategories);
       } else {

@@ -42,39 +42,35 @@ export const getUserCart = async (req, res) => {
 // Add an item to the cart
 export const addToCart = async (req, res) => {
   try {
-    const { userId, productId, variantId, quantity = 1 } = req.body;
-
-    // Validate input
-    if (!productId || !variantId) {
-      return res.status(400).json({ success: false, message: "Product and variant must be selected." });
-    }
-
+    const { userId, productId, variantId, quantity } = req.body;
+  
+    // Cari user
     const user = await userModel.findById(userId);
-
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res.status(404).json({ message: 'User tidak ditemukan' });
     }
-
-    // Check if the product variant already exists in the cart
-    const existingItem = user.cartData.find(
-      (item) =>
-        item.productId.equals(productId) && item.variantId.equals(variantId)
+  
+    // Cek apakah item sudah ada di keranjang
+    const existingCartItemIndex = user.cartData.findIndex(
+      (item) => item.productId.toString() === productId && item.variantId.toString() === variantId
     );
-
-    if (existingItem) {
-      existingItem.quantity += quantity; // Update quantity for existing item
+  
+    if (existingCartItemIndex !== -1) {
+      // Jika item sudah ada, update quantity
+      user.cartData[existingCartItemIndex].quantity += quantity;
     } else {
-      // Add new item to the cart
+      // Jika item belum ada, tambahkan item baru
       user.cartData.push({ productId, variantId, quantity });
     }
-
+  
     await user.save();
-    res.json({ success: true, message: "Item added to cart", cartData: user.cartData });
+    res.status(200).json({ message: 'Item ditambahkan ke keranjang', cart: user.cartData });
+  
   } catch (error) {
-    console.error("Failed to add item to cart", error);
-    res.status(500).json({ success: false, message: "Failed to add item to cart" });
+    console.error(error);
+    res.status(500).json({ message: 'Terjadi kesalahan server' });
   }
-};
+}
 
 // Update quantity of a cart item
 export const updateCart = async (req, res) => {

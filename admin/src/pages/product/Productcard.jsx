@@ -32,7 +32,7 @@ export const ProductCard = ({ product, onEdit, onDelete }) => {
       p={4}
     >
       <Flex align="start" gap={4}>
-        <Box w="20" h="20" flexShrink={0}>
+        <Box w="24" h="24" flexShrink={0}>
           {product.images && product.images.length > 0 ? (
             <Image
               src={product.images[0]}
@@ -54,6 +54,7 @@ export const ProductCard = ({ product, onEdit, onDelete }) => {
               <Text color="gray.400">No image</Text>
             </Flex>
           )}
+          
         </Box>
 
         <Box flex="1" position="relative">
@@ -67,6 +68,29 @@ export const ProductCard = ({ product, onEdit, onDelete }) => {
               </Text>
             </VStack>
             <Menu>
+            <VStack align="start" spacing={0}>
+              <Text fontSize="sm" color="gray.500">
+                Category
+              </Text>
+              <Text>{product.category.name}</Text>
+              <Text>{product.subCategory.name}</Text>
+            </VStack>
+            <VStack align="start" spacing={0}>
+              <Text fontSize="sm" color="gray.500">
+                SKU
+              </Text>
+              <Text fontSize="sm" fontWeight="medium">
+                {product.sku !==null ? product.sku : ""} 
+              </Text>
+            </VStack>
+            <VStack align="start" spacing={0}>
+              <Text fontSize="sm" color="gray.500">
+                Stock
+              </Text>
+              <Text fontSize="sm" fontWeight="medium">
+                {product.stock !== null ? product.stock : ""}
+              </Text>
+            </VStack>
               <MenuButton
                 as={IconButton}
                 aria-label="Options"
@@ -91,29 +115,9 @@ export const ProductCard = ({ product, onEdit, onDelete }) => {
           </Flex>
 
           <HStack mt={4} spacing={4}>
-            <VStack align="start" spacing={0}>
-              <Text fontSize="sm" color="gray.500">
-                Category
-              </Text>
-              <Text>{product.category.name}</Text>
-              <Text>{product.subCategory.name}</Text>
-            </VStack>
-            <VStack align="start" spacing={0}>
-              <Text fontSize="sm" color="gray.500">
-                SKU
-              </Text>
-              <Text fontSize="sm" fontWeight="medium">
-                {product.sku}
-              </Text>
-            </VStack>
-            <VStack align="start" spacing={0}>
-              <Text fontSize="sm" color="gray.500">
-                Stock
-              </Text>
-              <Text fontSize="sm" fontWeight="medium">
-                {product.stock}
-              </Text>
-            </VStack>
+
+
+
           </HStack>
 
           {product.variants && product.variants.length > 0 ? (

@@ -2,8 +2,7 @@ import React,{useState,useEffect} from 'react'
 import { toast } from 'react-toastify'
 import axios from 'axios'
 import { backendURI } from "../../App";
-
-
+import {assets} from '../../assets/assets'
 
 
 const Orders = ({ token }) => {

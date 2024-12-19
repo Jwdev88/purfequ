@@ -8,11 +8,15 @@ const addSubCategory = async (req, res) => {
     const file = req.file;
 
     if (!file) {
-      return res.status(400).json({ success: false, message: "File gambar tidak ditemukan." });
+      return res
+        .status(400)
+        .json({ success: false, message: "File gambar tidak ditemukan." });
     }
 
     if (!category) {
-      return res.status(400).json({ success: false, message: "Category ID is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Category ID is required" });
     }
 
     const imageUrl = await uploadImageToCloudinary(file);
@@ -26,7 +30,9 @@ const addSubCategory = async (req, res) => {
     });
 
     await newSubCategory.save();
-    res.status(200).json({ success: true, message: "Subcategory created successfully" });
+    res
+      .status(200)
+      .json({ success: true, message: "Subcategory created successfully" });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: error.message });
@@ -49,12 +55,18 @@ const getSubCategories = async (req, res) => {
   try {
     const categoryId = req.query.category;
 
-    // Validate category ID format
+    // Validate category ID format if provided
     if (categoryId && !mongoose.Types.ObjectId.isValid(categoryId)) {
-      return res.status(400).json({ success: false, message: "Invalid Category ID format." });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid Category ID format." });
     }
 
-    const subCategories = await SubCategory.find({ category: categoryId }).populate("category");
+    // Determine the query based on the presence of categoryId
+    const query = categoryId ? { category: categoryId } : {};
+
+    // Fetch subcategories based on the query
+    const subCategories = await SubCategory.find(query).populate("category");
 
     res.status(200).json({ success: true, subCategories });
   } catch (error) {
@@ -68,13 +80,17 @@ const getSubCategoryById = async (req, res) => {
     const { id } = req.params;
 
     if (!id) {
-      return res.status(400).json({ success: false, message: "SubCategory ID is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "SubCategory ID is required" });
     }
 
     const subcategory = await SubCategory.findById(id).populate("category");
 
     if (!subcategory) {
-      return res.status(404).json({ success: false, message: "Subcategory not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Subcategory not found" });
     }
 
     let imageData = [];
@@ -98,10 +114,18 @@ const getSubCategoryById = async (req, res) => {
     });
   } catch (error) {
     if (error.name === "CastError") {
-      return res.status(400).json({ success: false, message: "Invalid Subcategory ID format" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid Subcategory ID format" });
     }
     console.error("Error getting subcategory by ID:", error);
-    res.status(500).json({ success: false, message: "Failed to fetch subcategory", error: error.message });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to fetch subcategory",
+        error: error.message,
+      });
   }
 };
 
@@ -128,7 +152,9 @@ const updateSubCategory = async (req, res) => {
     }
 
     if (!updatedSubCategory) {
-      return res.status(404).json({ success: false, message: "Subcategory not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Subcategory not found" });
     }
 
     let imageData = [];
@@ -137,12 +163,17 @@ const updateSubCategory = async (req, res) => {
       try {
         imageData = [await cloudinary.api.resource(publicId)];
       } catch (cloudinaryError) {
-        console.error("Error fetching image data from Cloudinary:", cloudinaryError);
+        console.error(
+          "Error fetching image data from Cloudinary:",
+          cloudinaryError
+        );
         imageData = [];
       }
     }
 
-    res.status(200).json({ success: true, message: "Subcategory updated successfully" });
+    res
+      .status(200)
+      .json({ success: true, message: "Subcategory updated successfully" });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: error.message });
@@ -153,9 +184,13 @@ const deleteSubCategory = async (req, res) => {
   try {
     const subCategory = await SubCategory.findByIdAndDelete(req.params.id);
     if (!subCategory) {
-      return res.status(404).json({ success: false, message: "Subcategory not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Subcategory not found" });
     }
-    res.status(200).json({ success: true, message: "Subcategory deleted successfully" });
+    res
+      .status(200)
+      .json({ success: true, message: "Subcategory deleted successfully" });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: error.message });

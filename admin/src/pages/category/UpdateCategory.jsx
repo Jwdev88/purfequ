@@ -3,81 +3,75 @@ import axios from "axios";
 import { backendURI } from "../../App";
 import { toast } from "react-toastify";
 import { useParams, useNavigate } from "react-router-dom";
-import { useFormik } from "formik";
-import * as Yup from "yup";
+import {
+  Box,
+  Button,
+  FormControl,
+  FormLabel,
+  Input,
+  Select,
+  Textarea,
+  Spinner,
+  Image,
+} from "@chakra-ui/react";
 
 const UpdateCategory = ({ token }) => {
   const { categoryId } = useParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [initialImage, setInitialImage] = useState(null); // Untuk menampilkan gambar yang sudah ada
+  const [initialImage, setInitialImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-  const navigate = useNavigate();
-  const [image, setImage] = useState(null);
-
-  const initialValues = {
+  const [formValues, setFormValues] = useState({
     name: "",
     description: "",
-    status: "",
+    status: "active",
     image: null,
+  });
+
+  const navigate = useNavigate();
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormValues({ ...formValues, [name]: value });
   };
 
-  const validationSchema = Yup.object().shape({
-    name: Yup.string().required("Nama Category wajib diisi"),
-    description: Yup.string().required("Description Category wajib diisi"),
-    status: Yup.string().required("Status Category wajib diisi"),
-    image: Yup.mixed().test("fileSize", "Ukuran gambar tidak boleh lebih dari 2 MB", (value) => !value || value.size <= 2 * 1024 * 1024),
-  });
-
-  const formik = useFormik({
-    initialValues,
-    validationSchema,
-    enableReinitialize: true,
-    onSubmit: async (values, { setSubmitting }) => {
-      try {
-        const formData = new FormData();
-        formData.append("name", values.name);
-        formData.append("description", values.description);
-        formData.append("status", values.status);
-        if (values.image) {
-          formData.append("image", values.image);
-        }
-
-        const response = await axios.put(
-          `${backendURI}/api/category/edit/${categoryId}`,
-          formData,
-          { headers: { token } }
-        );
-
-        if (response.data.success) {
-          toast.success("Category berhasil diupdate!");
-          // Redirect atau lakukan aksi lain setelah update berhasil
-          navigate("/category/list");
-        } else {
-          toast.error(response.data.message || "Gagal mengupdate kategori");
-        }
-      } catch (error) {
-        console.error("Error:", error);
-        toast.error("Terjadi kesalahan");
-      } finally {
-        setSubmitting(false);
-      }
-    },
-  });
-
   const handleImageChange = (e) => {
-    const selectedImage = e.target.files[0];
-    setImage(selectedImage);
+    const file = e.target.files[0];
+    setFormValues({ ...formValues, image: file });
+    setImagePreview(URL.createObjectURL(file));
+  };
 
-    // Membuat preview gambar
-    if (selectedImage) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result);
-      };
-      reader.readAsDataURL(selectedImage);
-    } else {
-      setImagePreview(null); // Menghapus preview jika tidak ada gambar yang dipilih
+  const onSubmitHandler = async (e) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      const formData = new FormData();
+      Object.entries(formValues).forEach(([key, value]) => {
+        if (value) formData.append(key, value);
+      });
+
+      const response = await axios.put(
+        `${backendURI}/api/category/edit/${categoryId}`,
+        formData,
+        {
+          headers: {
+            token,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      if (response.data.success) {
+        toast.success("Category berhasil diupdate!");
+        navigate("/category/list");
+      } else {
+        toast.error(response.data.message || "Gagal mengupdate kategori");
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Terjadi kesalahan");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -109,7 +103,7 @@ const UpdateCategory = ({ token }) => {
 
         setInitialImage(categoryData.imageData[0].secure_urls);
 
-        formik.setValues({
+        setFormValues({
           name: categoryData.name || "",
           description: categoryData.description || "",
           status: categoryData.status || "active",
@@ -130,113 +124,80 @@ const UpdateCategory = ({ token }) => {
     } else {
       setLoading(false);
     }
-  }, [categoryId, token]); 
+  }, [categoryId, token]);
 
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <Box className="flex justify-center items-center h-screen">
+        <Spinner size="xl" />
+      </Box>
+    );
   }
 
   if (error) {
-    return <div>Error: {error}</div>;
+    return (
+      <Box className="flex justify-center items-center h-screen">
+        <p>{error}</p>
+      </Box>
+    );
   }
 
   return (
-    <form onSubmit={formik.handleSubmit} className="p-4">
-      {/* Tampilkan gambar awal atau preview gambar yang dipilih */}
+    <Box as="form" onSubmit={onSubmitHandler} p={4} className="flex flex-col md:w-2/3">
       {(initialImage || imagePreview) && (
-        <div className="mb-4">
-          <img
+        <Box mb={4}>
+          <Image
             src={imagePreview || initialImage}
             alt="Category Image"
-            className="max-w-xs"
+            maxW="xs"
           />
-        </div>
+        </Box>
       )}
 
-      <div className="mb-4">
-        <label htmlFor="image" className="block mb-2">
-          Upload Gambar
-        </label>
-        <input
-          type="file"
-          id="image"
-          onChange={handleImageChange}
-          className="w-full p-2 border border-gray-300 rounded"
-        />
-      </div>
+<FormControl mb={4}>
+        <FormLabel>Upload Gambar</FormLabel>
+        <Input type="file" onChange={handleImageChange} />
+        {imagePreview && <Image src={imagePreview} alt="Image Preview" mt={2} />}
+      </FormControl>
 
-      <div className="mb-4">
-        <label htmlFor="name" className="block mb-2">
-          Nama Category
-        </label>
-        <input
-          type="text"
-          id="name"
-          value={formik.values.name}
-          onChange={formik.handleChange}
-          onBlur={formik.handleBlur}
-          className={`w-full p-2 border border-gray-300 rounded ${
-            formik.touched.name && formik.errors.name ? "border-red-500" : ""
-          }`}
+      <FormControl mb={4}>
+        <FormLabel>Nama Category</FormLabel>
+        <Input
+          name="name"
+          value={formValues.name}
+          onChange={handleInputChange}
+          required
         />
-        {formik.touched.name && formik.errors.name && (
-          <div className="text-red-500">{formik.errors.name}</div>
-        )}
-      </div>
+      </FormControl>
 
-      <div className="mb-4">
-        <label htmlFor="description" className="block mb-2">
-          Description Category
-        </label>
-        <textarea
-          id="description"
-          value={formik.values.description}
-          onChange={formik.handleChange}
-          onBlur={formik.handleBlur}
-          className={`w-full p-2 border border-gray-300 rounded ${
-            formik.touched.description && formik.errors.description
-              ? "border-red-500"
-              : ""
-          }`}
+      <FormControl mb={4}>
+        <FormLabel>Description Category</FormLabel>
+        <Textarea
+          name="description"
+          value={formValues.description}
+          onChange={handleInputChange}
+          required
         />
-        {formik.touched.description && formik.errors.description && (
-          <div className="text-red-500">{formik.errors.description}</div>
-        )}
-      </div>
+      </FormControl>
 
-      <div className="mb-4">
-        <label htmlFor="status" className="block mb-2">
-          Status Category
-        </label>
-        <select
-          id="status"
-          value={formik.values.status}
-          onChange={formik.handleChange}
-          onBlur={formik.handleBlur}
-          className={`w-full p-2 border border-gray-300 rounded ${
-            formik.touched.status && formik.errors.status
-              ? "border-red-500"
-              : ""
-          }`}
+      <FormControl mb={4}>
+        <FormLabel>Status Category</FormLabel>
+        <Select
+          name="status"
+          value={formValues.status}
+          onChange={handleInputChange}
+          required
         >
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
-        </select>
-        {formik.touched.status && formik.errors.status && (
-          <div className="text-red-500">{formik.errors.status}</div>
-        )}
-      </div>
+        </Select>
+      </FormControl>
 
-      <button
-        type="submit"
-        disabled={formik.isSubmitting}
-        className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-      >
+      <Button type="submit" colorScheme="blue" mt={10}>
         Update Category
-      </button>
-    </form>
+      </Button>
+    </Box>
   );
 };
 
 export default UpdateCategory;
-

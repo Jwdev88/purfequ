@@ -79,6 +79,9 @@ const getCategories = async (req, res) => {
           _id: category._id,
           name: category.name,
           image: imageData || category.image,
+      
+          status: category.status,
+      
         };
       })
     );
@@ -86,6 +89,7 @@ const getCategories = async (req, res) => {
     const formattedSubCategories = subCategories.map((subCategory) => ({
       _id: subCategory._id,
       name: subCategory.name,
+    
       description: subCategory.description || null,
       status: subCategory.status,
       categoryId: subCategory.category ? subCategory.category._id : null,
