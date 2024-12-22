@@ -14,6 +14,7 @@ import {
   Text,
   FormErrorMessage,
   Checkbox,
+  Spinner,
 } from "@chakra-ui/react";
 import axios from "axios";
 import { backendURI } from "../../App";
@@ -36,22 +37,26 @@ const AddProduct = ({ token }) => {
   const [subCategories, setSubCategories] = useState([]);
   const [uploadedImages, setUploadedImages] = useState([]);
   const [imageErrors, setImageErrors] = useState([]);
-  const [productId, setProductId] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [hasVariants, setHasVariants] = useState(false);
   const toast = useToast();
 
   const fetchCategories = async () => {
+    setLoading(true);
     try {
       const response = await axios.get(`${backendURI}/api/category/list`, {
         headers: { token },
       });
       setCategories(response.data.categories || []);
     } catch (error) {
-      handleError("Gagal mengambil kategori");
+      handleError("Failed to fetch categories");
+    } finally {
+      setLoading(false);
     }
   };
 
   const fetchSubCategories = async (category) => {
+    setLoading(true);
     try {
       const response = await axios.get(`${backendURI}/api/subcategory/list`, {
         headers: { token },
@@ -59,7 +64,9 @@ const AddProduct = ({ token }) => {
       });
       setSubCategories(response.data.subCategories || []);
     } catch (error) {
-      handleError("Gagal mengambil subkategori");
+      handleError("Failed to fetch subcategories");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -82,7 +89,7 @@ const AddProduct = ({ token }) => {
     if (productDetails.category) {
       fetchSubCategories(productDetails.category);
     }
-  }, [productDetails.category, token]);
+  }, [productDetails.category]);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -95,12 +102,18 @@ const AddProduct = ({ token }) => {
   const handleVariantsCheckboxChange = (e) => {
     const isChecked = e.target.checked;
     setHasVariants(isChecked);
-    if (!isChecked) {
-        setVariants([]); // Clear variants safely
+
+    // Jika hasVariants true, reset nilai SKU, price, stock, dan weight
+    if (isChecked) {
+      setProductDetails((prevDetails) => ({
+        ...prevDetails,
+        sku: "",
+        price: "",
+        stock: "",
+        weight: "",
+      }));
     }
-};
-
-
+  };
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
     const newImageErrors = [];
@@ -108,7 +121,7 @@ const AddProduct = ({ token }) => {
     const newImages = files
       .map((file, index) => {
         if (file.size > 5 * 1024 * 1024) {
-          newImageErrors[index] = "Ukuran gambar harus kurang dari 5MB";
+          newImageErrors[index] = "Image size must be less than 5MB";
           return null;
         }
         return { file, preview: URL.createObjectURL(file) };
@@ -121,56 +134,63 @@ const AddProduct = ({ token }) => {
 
   const validateVariants = () => {
     if (!Array.isArray(variants)) {
+      toast({
+        title: "Validation Error",
+        description: "Variants must be an array.",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+      return false;
+    }
+    for (const variant of variants) {
+      if (!variant.name) {
         toast({
+          title: "Validation Error",
+          description: "Each variant must have a name.",
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+        });
+        return false;
+      }
+      for (const option of variant.options) {
+        if (
+          !option.name ||
+          option.stock < 0 ||
+          option.price < 0 ||
+          !option.sku ||
+          option.weight < 0
+        ) {
+          toast({
             title: "Validation Error",
-            description: "Variants must be an array.",
+            description:
+              "Each option must have valid name, stock, price, SKU, and weight.",
             status: "error",
             duration: 5000,
             isClosable: true,
-        });
-        return false;
-    }
-    for (const variant of variants) {
-        if (!variant.name) {
-            toast({
-                title: "Validation Error",
-                description: "Each variant must have a name.",
-                status: "error",
-                duration: 5000,
-                isClosable: true,
-            });
-            return false;
+          });
+          return false;
         }
-        for (const option of variant.options) {
-            if (!option.name || option.stock < 0 || option.price < 0 || !option.sku || option.weight < 0) {
-                toast({
-                    title: "Validation Error",
-                    description: "Each option must have valid name, stock, price, SKU, and weight.",
-                    status: "error",
-                    duration: 5000,
-                    isClosable: true,
-                });
-                return false;
-            }
-        }
+      }
     }
     return true;
-};
+  };
 
   const validateSubmission = () => {
     const errors = {};
-    if (!productDetails.name) errors.name = "Nama produk diperlukan.";
-    if (!productDetails.category) errors.category = "Kategori diperlukan.";
+    if (!productDetails.name) errors.name = "Product name is required.";
+    if (!productDetails.category) errors.category = "Category is required.";
     if (!uploadedImages.length)
-      errors.images = "Setidaknya satu gambar produk diperlukan.";
+      errors.images = "At least one product image is required.";
     if (!variants.length && hasVariants) {
-      errors.variants = "Varian harus ditambahkan jika produk memiliki varian.";
+      errors.variants = "Variants must be added if the product has variants.";
     }
 
     if (Object.keys(errors).length) {
       Object.values(errors).forEach((error) =>
         toast({
-          title: "Kesalahan Validasi",
+          title: "Validation Error",
           description: error,
           status: "error",
           duration: 5000,
@@ -181,41 +201,84 @@ const AddProduct = ({ token }) => {
     }
     return true;
   };
+
+  const addVariant = () => {
+    setVariants([...variants, { name: "", options: [] }]);
+  };
+  const addOptionToVariant = (variantIndex) => {
+    const newVariants = [...variants];
+    newVariants[variantIndex].options.push({
+      name: "",
+      stock: 0,
+      price: 0,
+      sku: "",
+      weight: 0,
+    });
+    setVariants(newVariants);
+  };
+  const handleVariantChange = (index, field, value) => {
+    const newVariants = [...variants];
+    newVariants[index][field] = value;
+    setVariants(newVariants);
+  };
+  const handleOptionChange = (variantIndex, optionIndex, field, value) => {
+    const newVariants = [...variants];
+    newVariants[variantIndex].options[optionIndex][field] = value;
+    setVariants(newVariants);
+  };
+  const removeVariant = (index) => {
+    setVariants(variants.filter((_, i) => i !== index));
+  };
+  const removeOptionFromVariant = (variantIndex, optionIndex) => {
+    const newVariants = [...variants];
+    newVariants[variantIndex].options = newVariants[
+      variantIndex
+    ].options.filter((_, i) => i !== optionIndex);
+    setVariants(newVariants);
+  };
   const onSubmitHandler = async (e) => {
     e.preventDefault();
-  
-    // Validasi varian (opsional, tetapi array harus valid)
+
     if (hasVariants && !validateVariants()) return;
-  
-    // Validasi data lainnya
     if (!validateSubmission()) return;
-  
+
+    setLoading(true);
     try {
       const formData = new FormData();
+
+      // Filter product details
+      const filteredDetails = { ...productDetails };
+      if (hasVariants) {
+        delete filteredDetails.price;
+        delete filteredDetails.stock;
+        delete filteredDetails.sku;
+        delete filteredDetails.weight;
+      }
+
       Object.keys(productDetails).forEach((key) =>
         formData.append(key, productDetails[key])
       );
-  
-      // Upload gambar
+
       uploadedImages.forEach((image, index) => {
         formData.append(`image${index + 1}`, image.file);
       });
-  
-      // Variants selalu dikirim
+
       formData.append("variants", JSON.stringify(variants));
-  
-      // Kirim data ke backend
-      const response = await axios.post(`${backendURI}/api/product/add`, formData, {
-        headers: {
-          token,
-          "Content-Type": "multipart/form-data",
-        },
-      });
-  
-      // Notifikasi sukses
+
+      const response = await axios.post(
+        `${backendURI}/api/product/add`,
+        formData,
+        {
+          headers: {
+            token,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
       if (response.data.success) {
         toast({
-          title: "Sukses",
+          title: "Success",
           description: response.data.message,
           status: "success",
           duration: 5000,
@@ -226,17 +289,17 @@ const AddProduct = ({ token }) => {
         throw new Error(response.data.message);
       }
     } catch (error) {
-      // Notifikasi error
       toast({
-        title: "Kesalahan",
+        title: "Error",
         description: error.response?.data?.message || error.message,
         status: "error",
         duration: 5000,
         isClosable: true,
       });
+    } finally {
+      setLoading(false);
     }
   };
-
   const resetForm = () => {
     setProductDetails({
       name: "",
@@ -254,76 +317,81 @@ const AddProduct = ({ token }) => {
     setImageErrors([]);
     setHasVariants(false);
   };
-
-  const addVariant = () => {
-    setVariants([...variants, { name: "", options: [] }]);
-  };
-
-  const addOptionToVariant = (variantIndex) => {
-    const newVariants = [...variants];
-    newVariants[variantIndex].options.push({
-      name: "",
-      stock: 0,
-      price: 0,
-      sku: "",
-      weight: 0,
-    });
-    setVariants(newVariants);
-  };
-
-  const handleVariantChange = (index, field, value) => {
-    const newVariants = [...variants];
-    newVariants[index][field] = value;
-    setVariants(newVariants);
-  };
-
-  const handleOptionChange = (variantIndex, optionIndex, field, value) => {
-    const newVariants = [...variants];
-    newVariants[variantIndex].options[optionIndex][field] = value;
-    setVariants(newVariants);
-  };
-
-  const removeVariant = (index) => {
-    setVariants(variants.filter((_, i) => i !== index));
-  };
-
   return (
     <Box as="form" onSubmit={onSubmitHandler}>
-      <FormControl mb={4} isInvalid={imageErrors.some(Boolean)}>
-        {/* Add Product Detail */}
-        <Text fontSize="xl" fontWeight="bold" mb={2}>
-          Add Detail Produk
-        </Text>
+    <Flex
+      direction="column"
+      gap={{ base: 4, md: 6 }}
+      px={{ base: 4, md: 8 }}
+      py={{ base: 6, md: 8 }}
+      maxWidth="4xl"
+      mx="auto"
+    >
+      <Text fontSize={{ base: 'xl', md: '2xl' }} fontWeight="bold" mb={2}>
+        Tambahkan Produk
+      </Text>
+      
+      {/* Image Uploads */}
+      <FormControl isInvalid={imageErrors.some(Boolean)}>
         <FormLabel>Upload Images</FormLabel>
-        <Flex gap={4}>
+        <Flex gap={4} wrap="wrap">
           {uploadedImages.map((image, index) => (
-            <Box key={index} position="relative">
+            <Box
+              key={index}
+              position="relative"
+              width={{ base: '80px', md: '96px' }}
+              height={{ base: '80px', md: '96px' }}
+              borderRadius="md"
+              overflow="hidden"
+            >
               <Image
                 src={image.preview}
                 alt={`Uploaded ${index}`}
-                width="96px"
-                height="96px"
                 objectFit="cover"
-                borderRadius="md"
+                width="100%"
+                height="100%"
+                boxShadow="md"
               />
+              <Button
+                position="absolute"
+                top="2px"
+                right="2px"
+                size="xs"
+                colorScheme="blue"
+                borderRadius="full"
+                variant="solid"
+                bg="gray.100"
+                color="gray.800"
+                _hover={{ bg: "gray.200" }}
+                _active={{ bg: "gray.300" }}
+                onClick={() =>
+                  setUploadedImages(
+                    uploadedImages.filter((_, i) => i !== index)
+                  )
+                }
+              >
+                ×
+              </Button>
+
               {imageErrors[index] && (
-                <Text color="red.500" fontSize="sm">
+                <Text color="red.500" fontSize="xs">
                   {imageErrors[index]}
                 </Text>
               )}
             </Box>
           ))}
-          <Box position="relative" cursor="pointer">
+          <Box>
             <label>
               <Flex
                 justifyContent="center"
                 alignItems="center"
-                width="96px"
-                height="96px"
-                borderWidth={2}
+                width={{ base: '80px', md: '96px' }}
+                height={{ base: '80px', md: '96px' }}
+                borderWidth="2px"
                 borderStyle="dashed"
                 borderColor="gray.300"
                 borderRadius="md"
+                cursor="pointer"
               >
                 <Icon as={assets.upload_icon} boxSize={8} color="gray.400" />
               </Flex>
@@ -339,78 +407,41 @@ const AddProduct = ({ token }) => {
         </Flex>
         {imageErrors.some(Boolean) && (
           <FormErrorMessage>
-            Beberapa gambar memiliki kesalahan. Silakan periksa.
+            Some images have issues. Please check them.
           </FormErrorMessage>
         )}
       </FormControl>
-      <FormControl mb={4}>
+
+      {/* Product Name */}
+      <FormControl isRequired>
         <FormLabel>Product Name</FormLabel>
         <Input
           name="name"
           value={productDetails.name}
           onChange={handleInputChange}
-          placeholder="Product Name"
+          placeholder="Enter product name"
         />
       </FormControl>
-      <FormControl mb={4}>
+
+      {/* Description */}
+      <FormControl isRequired>
         <FormLabel>Description</FormLabel>
         <Textarea
           name="description"
           value={productDetails.description}
           onChange={handleInputChange}
-          placeholder="Product Description"
+          placeholder="Enter product description"
         />
       </FormControl>
-      <FormControl mb={4}>
-        <FormLabel>Price</FormLabel>
-        <Input
-          name="price"
-          type="number"
-          value={productDetails.price}
-          onChange={handleInputChange}
-          placeholder="Product Price"
-          isDisabled={hasVariants}
-        />
-      </FormControl>
-      <FormControl mb={4}>
-        <FormLabel>Stock</FormLabel>
-        <Input
-          name="stock"
-          type="number"
-          value={productDetails.stock}
-          onChange={handleInputChange}
-          placeholder="Product Stock"
-          isDisabled={hasVariants}
-        />
-      </FormControl>
-      <FormControl mb={4}>
-        <FormLabel>Product SKU</FormLabel>
-        <Input
-          name="sku"
-          value={productDetails.sku}
-          onChange={handleInputChange}
-          placeholder="Product SKU"
-          isDisabled={hasVariants}
-        />
-      </FormControl>
-      <FormControl mb={4}>
-        <FormLabel>Product Weight</FormLabel>
-        <Input
-          name="weight"
-          type="number"
-          value={productDetails.weight}
-          onChange={handleInputChange}
-          placeholder="Product Weight (in kg)"
-          isDisabled={hasVariants}
-        />
-      </FormControl>
-      <FormControl mb={4}>
+
+      {/* Category */}
+      <FormControl isRequired>
         <FormLabel>Category</FormLabel>
         <Select
           name="category"
           value={productDetails.category}
           onChange={handleInputChange}
-          placeholder="Select Category"
+          placeholder="Select category"
         >
           {categories.map((category) => (
             <option key={category._id} value={category._id}>
@@ -419,14 +450,15 @@ const AddProduct = ({ token }) => {
           ))}
         </Select>
       </FormControl>
-      <FormControl mb={4}>
+
+      {/* Subcategory */}
+      <FormControl isDisabled={!productDetails.category}>
         <FormLabel>Subcategory</FormLabel>
         <Select
           name="subCategory"
           value={productDetails.subCategory}
           onChange={handleInputChange}
-          placeholder="Select Subcategory"
-          isDisabled={!productDetails.category}
+          placeholder="Select subcategory"
         >
           {subCategories.map((subCategory) => (
             <option key={subCategory._id} value={subCategory._id}>
@@ -435,7 +467,60 @@ const AddProduct = ({ token }) => {
           ))}
         </Select>
       </FormControl>
-      <FormControl mb={4}>
+
+      {/* Price */}
+      <FormControl isRequired>
+        <FormLabel>Price</FormLabel>
+        <Input
+          type="number"
+          name="price"
+          value={productDetails.price}
+          onChange={handleInputChange}
+          placeholder="Enter product price"
+          isDisabled={hasVariants}
+        />
+      </FormControl>
+
+      {/* Stock */}
+      <FormControl isRequired>
+        <FormLabel>Stock</FormLabel>
+        <Input
+          type="number"
+          name="stock"
+          value={productDetails.stock}
+          onChange={handleInputChange}
+          placeholder="Enter product stock"
+          isDisabled={hasVariants}
+        />
+      </FormControl>
+
+      {/* SKU */}
+      <FormControl isRequired>
+        <FormLabel>SKU</FormLabel>
+        <Input
+          name="sku"
+          value={productDetails.sku}
+          onChange={handleInputChange}
+          placeholder="Enter product SKU"
+          isDisabled={hasVariants}
+        />
+      </FormControl>
+
+      {/* Weight */}
+      <FormControl isRequired>
+        <FormLabel>Weight (gram)</FormLabel>
+        <Input
+          type="number"
+          name="weight"
+          value={productDetails.weight}
+          onChange={handleInputChange}
+          placeholder="Enter product weight"
+          isDisabled={hasVariants}
+        />
+      </FormControl>
+
+      {/* Best Seller Checkbox */}
+      <FormControl>
         <Checkbox
           name="bestSeller"
           isChecked={productDetails.bestSeller}
@@ -445,109 +530,155 @@ const AddProduct = ({ token }) => {
         </Checkbox>
       </FormControl>
 
-      <FormControl mb={4}>
+      {/* Variants Checkbox */}
+      <FormControl>
         <Checkbox
           name="hasVariants"
           isChecked={hasVariants}
           onChange={handleVariantsCheckboxChange}
         >
-          Apakah Produk Memiliki Varian?
+          Produk memiliki varian?
         </Checkbox>
       </FormControl>
 
       {hasVariants && (
-        <Box mb={4}>
-          <Button onClick={addVariant} colorScheme="teal" mb={2}>
+        <Box>
+          <Button onClick={addVariant} colorScheme="blue" mb={4}>
             Add Variant
           </Button>
           {variants.map((variant, variantIndex) => (
-            <Box key={variantIndex} mb={4}>
-              <FormControl mb={2}>
-                <FormLabel>Variant Name</FormLabel>
+            <Box
+              key={variantIndex}
+              borderWidth="1px"
+              borderRadius="md"
+              p={4}
+              mb={4}
+            >
+              <Flex justifyContent="space-between">
+                <FormLabel>Variant {variantIndex + 1}</FormLabel>
+                <Button
+                  size="sm"
+                  colorScheme="red"
+                  onClick={() => removeVariant(variantIndex)}
+                >
+                  Remove Variant
+                </Button>
+              </Flex>
+              <FormControl isRequired>
+                <FormLabel>Name</FormLabel>
                 <Input
                   value={variant.name}
                   onChange={(e) =>
                     handleVariantChange(variantIndex, "name", e.target.value)
                   }
+                  placeholder="Enter variant name"
                 />
               </FormControl>
               <Button
+                mt={2}
                 onClick={() => addOptionToVariant(variantIndex)}
                 colorScheme="teal"
-                mb={2}
               >
                 Add Option
               </Button>
               {variant.options.map((option, optionIndex) => (
-                <Flex key={optionIndex} mb={2}>
-                  <Input
-                    placeholder="Option Name"
-                    value={option.name}
-                    onChange={(e) =>
-                      handleOptionChange(
-                        variantIndex,
-                        optionIndex,
-                        "name",
-                        e.target.value
-                      )
+                <Flex
+                  mt={2}
+                  key={optionIndex}
+                  gap={2}
+                  direction={{ base: "column", md: "row" }}
+                >
+                  <FormControl>
+                    <FormLabel>Name</FormLabel>
+                    <Input
+                      value={option.name}
+                      onChange={(e) =>
+                        handleOptionChange(
+                          variantIndex,
+                          optionIndex,
+                          "name",
+                          e.target.value
+                        )
+                      }
+                    />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel>Stock</FormLabel>
+                    <Input
+                      type="number"
+                      value={option.stock}
+                      onChange={(e) =>
+                        handleOptionChange(
+                          variantIndex,
+                          optionIndex,
+                          "stock",
+                          e.target.value
+                        )
+                      }
+                    />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel>Price</FormLabel>
+                    <Input
+                      type="number"
+                      value={option.price}
+                      onChange={(e) =>
+                        handleOptionChange(
+                          variantIndex,
+                          optionIndex,
+                          "price",
+                          e.target.value
+                        )
+                      }
+                    />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel>SKU</FormLabel>
+                    <Input
+                      value={option.sku}
+                      onChange={(e) =>
+                        handleOptionChange(
+                          variantIndex,
+                          optionIndex,
+                          "sku",
+                          e.target.value
+                        )
+                      }
+                    />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel>Weight (g)</FormLabel>
+                    <Input
+                      type="number"
+                      value={option.weight || 100}
+                      onChange={(e) =>
+                        handleOptionChange(
+                          variantIndex,
+                          optionIndex,
+                          "weight",
+                          e.target.value
+                        )
+                      }
+                    />
+                  </FormControl>
+
+                  <Button
+                    size="lg"
+                    colorScheme="red"
+                    onClick={() =>
+                      removeOptionFromVariant(variantIndex, optionIndex)
                     }
-                    mr={2}
-                  />
-                  <Input
-                    placeholder="Stock"
-                    type="number"
-                    value={option.stock}
-                    onChange={(e) =>
-                      handleOptionChange(
-                        variantIndex,
-                        optionIndex,
-                        "stock",
-                        parseInt(e.target.value, 10)
-                      )
-                    }
-                    mr={2}
-                  />
-                  <Input
-                    placeholder="Price"
-                    type="number"
-                    value={option.price}
-                    onChange={(e) =>
-                      handleOptionChange(
-                        variantIndex,
-                        optionIndex,
-                        "price",
-                        parseFloat(e.target.value)
-                      )
-                    }
-                    mr={2}
-                  />
-                  <Input
-                    placeholder="SKU"
-                    value={option.sku}
-                    onChange={(e) =>
-                      handleOptionChange(
-                        variantIndex,
-                        optionIndex,
-                        "sku",
-                        e.target.value
-                      )
-                    }
-                    mr={2}
-                  />
-                  <Input
-                    placeholder="Weight"
-                    type="number"
-                    value={option.weight}
-                    onChange={(e) =>
-                      handleOptionChange(
-                        variantIndex,
-                        optionIndex,
-                        "weight",
-                        parseFloat(e.target.value)
-                      )
-                    }
-                    mr={2}
-                  />
+                    width="80px"
+                    height="20px"
+                    fontSize="sm"
+                    display="flex"
+                    justifyContent="center"
+                    alignItems="center"
+                    mt={6}
+                    py={6}
+                  >
+                    Remove
+                  </Button>
                 </Flex>
               ))}
             </Box>
@@ -555,11 +686,17 @@ const AddProduct = ({ token }) => {
         </Box>
       )}
 
-      <Button type="submit" colorScheme="blue" mt={4}>
-        Add Product
-      </Button>
-    </Box>
-  );
+      {loading ? (
+        <Spinner size="lg" />
+      ) : (
+        <Button type="submit" colorScheme="green" mt={4}>
+          Submit Product
+        </Button>
+      )}
+    </Flex>
+  </Box>
+);
+
 };
 
 export default AddProduct;
