@@ -96,9 +96,10 @@ const AddProduct = ({ token }) => {
     const isChecked = e.target.checked;
     setHasVariants(isChecked);
     if (!isChecked) {
-      setVariants([]); // Clear variants if the checkbox is unchecked
+        setVariants([]); // Clear variants safely
     }
-  };
+};
+
 
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
@@ -119,39 +120,42 @@ const AddProduct = ({ token }) => {
   };
 
   const validateVariants = () => {
-    for (const variant of variants) {
-      if (!variant.name) {
+    if (!Array.isArray(variants)) {
         toast({
-          title: "Validation Error",
-          description: "Each variant must have a name.",
-          status: "error",
-          duration: 5000,
-          isClosable: true,
-        });
-        return false;
-      }
-      for (const option of variant.options) {
-        if (
-          !option.name ||
-          option.stock < 0 ||
-          option.price < 0 ||
-          !option.sku ||
-          option.weight < 0
-        ) {
-          toast({
             title: "Validation Error",
-            description:
-              "Each option must have valid name, stock, price, SKU, and weight.",
+            description: "Variants must be an array.",
             status: "error",
             duration: 5000,
             isClosable: true,
-          });
-          return false;
+        });
+        return false;
+    }
+    for (const variant of variants) {
+        if (!variant.name) {
+            toast({
+                title: "Validation Error",
+                description: "Each variant must have a name.",
+                status: "error",
+                duration: 5000,
+                isClosable: true,
+            });
+            return false;
         }
-      }
+        for (const option of variant.options) {
+            if (!option.name || option.stock < 0 || option.price < 0 || !option.sku || option.weight < 0) {
+                toast({
+                    title: "Validation Error",
+                    description: "Each option must have valid name, stock, price, SKU, and weight.",
+                    status: "error",
+                    duration: 5000,
+                    isClosable: true,
+                });
+                return false;
+            }
+        }
     }
     return true;
-  };
+};
 
   const validateSubmission = () => {
     const errors = {};
@@ -177,38 +181,39 @@ const AddProduct = ({ token }) => {
     }
     return true;
   };
-
   const onSubmitHandler = async (e) => {
     e.preventDefault();
-    if (!validateVariants()) return;
+  
+    // Validasi varian (opsional, tetapi array harus valid)
+    if (hasVariants && !validateVariants()) return;
+  
+    // Validasi data lainnya
     if (!validateSubmission()) return;
-
+  
     try {
       const formData = new FormData();
       Object.keys(productDetails).forEach((key) =>
         formData.append(key, productDetails[key])
       );
+  
+      // Upload gambar
       uploadedImages.forEach((image, index) => {
         formData.append(`image${index + 1}`, image.file);
       });
-
-      if (Array.isArray(variants) && variants.length > 0) {
-        formData.append("variants", JSON.stringify(variants));
-      }
-
-      const response = await axios.post(
-        `${backendURI}/api/product/add`,
-        formData,
-        {
-          headers: {
-            token,
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-
-      if (response.data.success && response.data.productId) {
-        setProductId(response.data.productId);
+  
+      // Variants selalu dikirim
+      formData.append("variants", JSON.stringify(variants));
+  
+      // Kirim data ke backend
+      const response = await axios.post(`${backendURI}/api/product/add`, formData, {
+        headers: {
+          token,
+          "Content-Type": "multipart/form-data",
+        },
+      });
+  
+      // Notifikasi sukses
+      if (response.data.success) {
         toast({
           title: "Sukses",
           description: response.data.message,
@@ -221,7 +226,14 @@ const AddProduct = ({ token }) => {
         throw new Error(response.data.message);
       }
     } catch (error) {
-      handleError(error.response?.data?.message || error.message);
+      // Notifikasi error
+      toast({
+        title: "Kesalahan",
+        description: error.response?.data?.message || error.message,
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
     }
   };
 

@@ -3,7 +3,6 @@ import Product from "../models/productModel.js";
 import mongoose from "mongoose";
 //create sukses
 
-
 const addProduct = async (req, res) => {
   try {
     const {
@@ -19,7 +18,7 @@ const addProduct = async (req, res) => {
       sku,
     } = req.body;
 
-    console.log("req.body", req.body);
+    console.log("req.body:", req.body);
 
     // Handle image uploads
     const image1 = req.files?.image1?.[0];
@@ -38,67 +37,78 @@ const addProduct = async (req, res) => {
       })
     );
 
-    // Parse variants data
-    let parsedVariants;
-    try {
-      parsedVariants =
-        typeof variants === "string" ? JSON.parse(variants) : variants;
+    // Parse and validate variants data
+    let parsedVariants = [];
+    if (variants) {
+      try {
+        parsedVariants =
+          typeof variants === "string" ? JSON.parse(variants) : variants;
 
-      // Validate variants structure
-      if (!Array.isArray(parsedVariants)) {
-        throw new Error("Variants must be an array");
-      }
-
-      // Validate each variant and its options
-      const skuSet = new Set();
-      parsedVariants.forEach((variant, index) => {
-        if (!variant.name || !Array.isArray(variant.options)) {
-          throw new Error(`Invalid variant structure at index ${index}`);
+        if (!Array.isArray(parsedVariants)) {
+          throw new Error("Variants must be an array");
         }
 
-        variant.options.forEach((option, optIndex) => {
-          // Convert stock, price, and weight to numbers
-          option.stock = Number(option.stock);
-          option.price = Number(option.price);
-          option.weight = Number(option.weight);
-
-          if (!option.name || isNaN(option.stock)) {
-            throw new Error(
-              `Invalid option structure in variant ${index}, option ${optIndex}`
-            );
+        const skuSet = new Set();
+        parsedVariants.forEach((variant, index) => {
+          if (!variant.name || !Array.isArray(variant.options)) {
+            throw new Error(`Invalid variant structure at index ${index}`);
           }
 
-          // Check if variant SKU is unique
-          if (skuSet.has(option.sku)) {
-            throw new Error(
-              `Duplicate SKU found in variant ${index}, option ${optIndex}`
-            );
-          }
-          skuSet.add(option.sku);
+          variant.options.forEach((option, optIndex) => {
+            option.stock = Number(option.stock);
+            option.price = Number(option.price);
+            option.weight = Number(option.weight);
+
+            if (!option.name || isNaN(option.stock) || isNaN(option.price) || isNaN(option.weight)) {
+              throw new Error(
+                `Invalid option structure in variant ${index}, option ${optIndex}`
+              );
+            }
+
+            if (skuSet.has(option.sku)) {
+              throw new Error(
+                `Duplicate SKU found in variant ${index}, option ${optIndex}`
+              );
+            }
+            skuSet.add(option.sku);
+          });
         });
-      });
-    } catch (error) {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid variants data: ${error.message}`,
-      });
-    }
-
-    // If no variants, ensure SKU is provided and unique
-    if (!parsedVariants.length) {
-      if (!sku) {
+      } catch (error) {
         return res.status(400).json({
           success: false,
-          message: "Path `sku` is required.",
+          message: `Invalid variants data: ${error.message}`,
+        });
+      }
+    }
+
+    if (!parsedVariants.length) {
+      if (!name || !price || !stock || !sku) {
+        return res.status(400).json({
+          success: false,
+          message: "Nama, harga, stok, dan SKU diperlukan untuk produk tanpa varian.",
         });
       }
 
-      // Check for SKU uniqueness
       const existingProduct = await Product.findOne({ sku });
       if (existingProduct) {
         return res.status(400).json({
           success: false,
           message: "SKU produk sudah terdaftar.",
+        });
+      }
+    } else {
+      const allSKUs = parsedVariants.flatMap((variant) =>
+        variant.options.map((option) => option.sku)
+      );
+
+      const existingSKUs = await Product.find({ "variants.options.sku": { $in: allSKUs } }).select(
+        "variants.options.sku"
+      );
+
+      if (existingSKUs.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: `SKU berikut sudah terdaftar: ${existingSKUs.map((p) => p.sku).join(", ")}`,
         });
       }
     }
@@ -128,7 +138,6 @@ const addProduct = async (req, res) => {
 
     try {
       const product = new Product(productData);
-
       await product.save();
 
       res.status(201).json({
@@ -137,7 +146,6 @@ const addProduct = async (req, res) => {
       });
     } catch (error) {
       if (error.code === 11000) {
-        console.log("Duplicate key error:", error);
         return res.status(400).json({
           success: false,
           message: "SKU produk sudah terdaftar.",
@@ -158,6 +166,8 @@ const addProduct = async (req, res) => {
     });
   }
 };
+
+
 
 
 const getProducts = async (req, res) => {
