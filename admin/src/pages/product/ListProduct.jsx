@@ -15,7 +15,7 @@ import {
 } from "@chakra-ui/react";
 import { toast } from "react-toastify";
 import { SearchIcon, AddIcon } from "@chakra-ui/icons";
-import ProductCard from "./Productcard";
+import {ProductCard} from "./Productcard";
 import { backendURI } from "../../App";
 import ProductPagination from "../../ProductPagination";
 
