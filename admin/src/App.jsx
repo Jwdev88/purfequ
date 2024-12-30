@@ -18,9 +18,9 @@ import CategoryList from "./pages/category/ListCategory";
 import UpdateCategory from "./pages/category/UpdateCategory";
 
 // SubCategory
-import AddSubCategoryForm from "./pages/subCategory/AddsubCategory"
-import ListSubCategory from "./pages/subCategory/ListSubCategory";
-import UpdateSubCategory from "./pages/subCategory/UpdatesubCategory";
+import AddSubCategoryForm from "./pages/subcategory/AddSubCategory";
+import ListSubCategory from "./pages/subcategory/ListSubCategory";
+import UpdateSubCategory from "./pages/subcategory/UpdateSubCategory";
 
 ///
 
