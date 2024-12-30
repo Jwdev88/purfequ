@@ -14,6 +14,7 @@ import {
   Tbody,
   Td,
   Th,
+  Tr,
   Thead,
   
   Text,
