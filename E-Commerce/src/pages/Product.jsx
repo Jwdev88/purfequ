@@ -80,23 +80,26 @@ const Product = (token) => {
   };
 
   // Handle adding product to cart
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!productData) return;
   
-    // Validasi varian sebelum ditambahkan ke cart
+    // Validate variant selection before adding to cart
     if (!validateVariantSelection(productData, selectedVariants)) return;
   
-    addToCart(productData._id, selectedVariants)
-      .then((result) => {
-        if (result.success) {
-          toast.success(`${productData.name} added to cart.`);
-        } else {
-          toast.error(result.message);
-        }
-      })
-      .catch((err) => console.error("Error in handleAddToCart:", err));
-  };
+    try {
+      const result = await addToCart(productData._id, selectedVariants);
+      console.log("addToCart result:", result);
   
+      if (result && result.success) {
+        toast.success(`${productData.name} added to cart.`);
+      } else {
+        toast.error(result?.message || "Something went wrong while adding to cart.");
+      }
+    } catch (err) {
+      console.error("Error in handleAddToCart:", err);
+      toast.error("An error occurred while adding to cart.");
+    }
+  };
 
   // Handle variant selection
   const handleVariantChange = (variantName, selectedOptionId) => {
