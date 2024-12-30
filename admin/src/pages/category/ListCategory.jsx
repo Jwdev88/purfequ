@@ -15,7 +15,7 @@ import {
   Td,
   Th,
   Thead,
-  Tr,
+  
   Text,
   Badge,
   Image,
@@ -31,7 +31,7 @@ const CategoryList = ({ token }) => {
   const [sortName, setSortName] = useState("");
   const [sortStatus, setSortStatus] = useState("");
   const navigate = useNavigate();
-
+// 
   useEffect(() => {
     fetchCategories();
   }, [token]);

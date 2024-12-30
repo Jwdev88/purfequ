@@ -13,7 +13,7 @@ import {
   Textarea,
   Image,
 } from '@chakra-ui/react';
-
+// 
 const AddCategoryForm = () => {
   const [name, setName] = useState('');
   const [image, setImage] = useState(null);

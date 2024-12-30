@@ -29,7 +29,7 @@ const UpdateCategory = ({ token }) => {
   });
 
   const navigate = useNavigate();
-
+// 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormValues({ ...formValues, [name]: value });

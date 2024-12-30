@@ -14,7 +14,7 @@ import {
   Spinner,
   Image,
 } from "@chakra-ui/react";
-
+// 
 const UpdateSubCategory = ({ token }) => {
   const { subcategoryId } = useParams();
   const [categories, setCategories] = useState([]);
