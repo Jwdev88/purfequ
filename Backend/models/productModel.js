@@ -1,12 +1,21 @@
 import mongoose from "mongoose";
 
+// const variantOptionSchema = new mongoose.Schema({
+//   name: { type: String, required: true },
+//   stock: { type: Number, required: true, min: 0 },
+//   price: { type: Number, required: true, min: 0 },
+//   sku: { type: String, required: true, unique: true },
+//   weight: { type: Number, required: true, min: 0 },
+// });
+// Schema untuk opsi varian
 const variantOptionSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  stock: { type: Number, required: true, min: 0 },
-  price: { type: Number, required: true, min: 0 },
-  sku: { type: String, required: true, unique: true },
-  weight: { type: Number, required: true, min: 0 },
+  name: { type: String, required: true },    // Misalnya: "Small", "Red"
+  sku: { type: String, required: true, unique: true },  // SKU untuk opsi tertentu
+  price: { type: Number, required: true },   // Harga untuk opsi tertentu
+  stock: { type: Number, required: true, min: 0 },  // Stok untuk opsi tertentu
+  weight: { type: Number, required: true, min: 0 }, // Berat untuk opsi tertentu
 });
+
 
 const variantSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -48,7 +57,6 @@ const productSchema = new mongoose.Schema(
     ],
     sku: {
       type: String,
-    
       trim: true,
       uppercase: true,
       index: true,

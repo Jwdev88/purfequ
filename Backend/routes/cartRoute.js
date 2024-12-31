@@ -7,7 +7,7 @@ const cartRouter = express.Router();
 
 // Route untuk mendapatkan cart
 cartRouter.post('/get',authUser, getUserCart);
-cartRouter.post('/add', addToCart);
+cartRouter.post('/add',authUser, addToCart);
 cartRouter.post('/update',authUser, updateCart);
 cartRouter.post('/clear',authUser, clearCart);
 

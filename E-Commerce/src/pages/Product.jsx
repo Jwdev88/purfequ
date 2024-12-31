@@ -6,116 +6,110 @@ import { Stars } from "lucide-react";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-const Product = (token) => {
+const Product = () => {
   const { productId } = useParams();
   const { products, addToCart, formatIDR } = useContext(ShopContext);
   const [productData, setProductData] = useState(null);
   const [image, setImage] = useState("");
-  const [selectedVariants, setSelectedVariants] = useState({});
+  const [selectedVariant, setSelectedVariant] = useState(null); // Store active variant and option
   const [isLoading, setIsLoading] = useState(true);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [variantPrice, setVariantPrice] = useState(0);
+  const [variantStock, setVariantStock] = useState(0);
 
   // Fetch product data
-  useEffect(
-    () => {
-      if (!products.length) return;
+  useEffect(() => {
+    if (!products.length) return;
 
-      const foundProduct = products.find((item) => item._id === productId);
-      if (foundProduct) {
-        setProductData(foundProduct);
-        setImage(foundProduct.images?.[0] || "");
-        initializeVariants(foundProduct);
-      } else {
-        setProductData(null);
-      }
-
-      setIsLoading(false);
-    },
-    [productId, products],
-    [token]
-  );
-
-  // Initialize default variants
-  const initializeVariants = (product) => {
-    const initialVariants = {};
-    product.variants?.forEach((variant) => {
-      initialVariants[variant.name] = variant.options?.[0]?._id || null;
-    });
-    setSelectedVariants(initialVariants);
-  };
-
-  // Get variant price based on selection
-  const getVariantPrice = () => {
-    if (!productData || !productData.variants?.length) {
-      return productData?.price || 0;
+    const foundProduct = products.find((item) => item._id === productId);
+    if (foundProduct) {
+      setProductData(foundProduct);
+      setImage(foundProduct.images?.[0] || "");
+      resetVariantState(); // Reset variant state on new product
+    } else {
+      setProductData(null);
     }
 
-    let variantPrice = productData.price;
-    productData.variants.forEach((variant) => {
-      const selectedOptionId = selectedVariants[variant.name];
-      const optionData = variant.options.find(
-        (option) => option._id === selectedOptionId
-      );
-      if (optionData?.price !== undefined) {
-        variantPrice = optionData.price;
-      }
-    });
-    return variantPrice;
+    setIsLoading(false);
+  }, [productId, products]);
+
+  // Reset selected variant state
+  const resetVariantState = () => {
+    setSelectedVariant(null);
+    setVariantPrice(productData?.price || 0); // Default price
+    setVariantStock(productData?.stock || 0); // Default stock
   };
 
-  // Validate all variants are selected
-  const validateVariantSelection = (productData, selectedVariants) => {
-    if (!productData || !productData.variants) return false;
+  // Handle variant selection
+  const handleVariantChange = (variantName, selectedOptionId) => {
+    // Find the selected variant and option
+    const selectedVariant = productData.variants.find((variant) => variant.name === variantName);
+    const selectedOption = selectedVariant.options.find((option) => option._id === selectedOptionId);
 
-    const missingVariants = productData.variants.filter(
-      (variant) => !selectedVariants[variant.name]
-    );
+    if (!selectedOption) return;
 
-    if (missingVariants.length > 0) {
-      const missingNames = missingVariants.map((v) => v.name).join(", ");
-      toast.error(`Please select options for: ${missingNames}`);
+    // Update the selected variant
+    setSelectedVariant({
+      variantName,
+      variantId: selectedVariant._id,
+      optionId: selectedOptionId,
+      optionName: selectedOption.name,
+    });
+
+    // Update price and stock
+    setVariantPrice(selectedOption.price);
+    setVariantStock(selectedOption.stock);
+
+    // Update main product image
+    if (selectedOption.image) setImage(selectedOption.image);
+  };
+
+  // Validate variant selection
+  const validateVariantSelection = () => {
+    if (!selectedVariant) {
+      toast.error("Please select a variant option.");
       return false;
     }
-
     return true;
   };
 
   // Handle adding product to cart
   const handleAddToCart = async () => {
     if (!productData) return;
-  
-    // Validate variant selection before adding to cart
-    if (!validateVariantSelection(productData, selectedVariants)) return;
-  
+
+    // Validate if a variant is selected
+    if (!validateVariantSelection()) return;
+
     try {
-      const result = await addToCart(productData._id, selectedVariants);
-      console.log("addToCart result:", result);
-  
-      if (result && result.success) {
-        toast.success(`${productData.name} added to cart.`);
+      // Prepare payload for adding to cart
+      const payload = {
+        productId: productData._id,
+        variantId: [
+          {
+            variantId: selectedVariant.variantId,
+            optionId: selectedVariant.optionId,
+          },
+        ],
+        quantity: 1,
+      };
+
+      // Add to cart
+      const result = await addToCart(
+        productData._id,
+        payload.variantId,
+        payload.quantity
+      );
+
+      if (result?.success) {
+        toast.success(`${productData.name} successfully added to cart.`);
       } else {
-        toast.error(result?.message || "Something went wrong while adding to cart.");
+        const errorMessage = result?.message || "Failed to add product to cart.";
+        toast.error(errorMessage);
       }
     } catch (err) {
       console.error("Error in handleAddToCart:", err);
       toast.error("An error occurred while adding to cart.");
     }
-  };
-
-  // Handle variant selection
-  const handleVariantChange = (variantName, selectedOptionId) => {
-    setSelectedVariants({
-      ...selectedVariants,
-      [variantName]: selectedOptionId,
-    });
-
-    const selectedVariant = productData.variants.find(
-      (variant) => variant.name === variantName
-    );
-    const selectedOption = selectedVariant?.options.find(
-      (option) => option._id === selectedOptionId
-    );
-
-    if (selectedOption?.image) setImage(selectedOption.image);
   };
 
   if (isLoading) {
@@ -176,7 +170,7 @@ const Product = (token) => {
             </span>
           </div>
           <p className="mt-2 text-2xl font-semibold">
-            {formatIDR(getVariantPrice())}
+            {formatIDR(variantPrice)}
           </p>
           <p className="mt-2">
             <span className="font-semibold">Category: </span>
@@ -187,7 +181,7 @@ const Product = (token) => {
           {/* Variants */}
           {productData.variants?.length > 0 && (
             <div className="mt-4">
-              <p className="font-serif font-semibold">Select Variants</p>
+              <p className="font-serif font-semibold">Select Variant</p>
               {productData.variants.map((variant) => (
                 <div key={variant._id} className="mt-2">
                   <p>{variant.name}</p>
@@ -199,7 +193,8 @@ const Product = (token) => {
                           handleVariantChange(variant.name, option._id)
                         }
                         className={`px-3 py-2 border rounded-md ${
-                          selectedVariants[variant.name] === option._id
+                          selectedVariant?.variantName === variant.name &&
+                          selectedVariant?.optionId === option._id
                             ? "bg-blue-100 border-blue-500 text-blue-700"
                             : "border-gray-300 hover:bg-gray-100"
                         }`}
@@ -216,9 +211,14 @@ const Product = (token) => {
           {/* Add to Cart Button */}
           <button
             onClick={handleAddToCart}
-            className="mt-4 bg-black text-white px-6 py-2 rounded hover:bg-gray-800"
+            disabled={isAddingToCart}
+            className={`mt-4 px-6 py-2 rounded ${
+              isAddingToCart
+                ? "bg-gray-500 text-white cursor-not-allowed"
+                : "bg-black text-white hover:bg-gray-800"
+            }`}
           >
-            Add to Cart
+            {isAddingToCart ? "Adding..." : "Add to Cart"}
           </button>
         </div>
       </div>

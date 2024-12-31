@@ -30,65 +30,114 @@ const validateCartInput = (data, requireVariant = false) => {
 // Get user's cart by userId
 export const getUserCart = async (req, res) => {
   try {
-    const { userId } = req.body;
-
-    // Validate input
-    const { error } = validateCartInput({ userId });
-    if (error)
+    // Extract user ID from the token
+    const { userId } = req.query;
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) {
       return res
-        .status(400)
-        .json({ success: false, message: error.details[0].message });
+        .status(401)
+        .json({ success: false, message: "Authorization token missing" });
+    }
 
-    const user = await userModel.findById(userId).populate("cartData");
+    // // Verify token
+    // const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // const userId = decoded.id;
 
+    // Fetch user and cart data
+    const user = await userModel.findById(userId).populate("cartData.productId");
     if (!user) {
       return res
         .status(404)
         .json({ success: false, message: "User not found" });
     }
 
-    res.json({ success: true, cartData: user.cartData });
+    // Return cart data
+    res.status(200)
+    json({ success: true, cartData: user.cartData });
   } catch (error) {
-    handleError(res, error, "Failed to fetch user cart");
+    console.error("Error fetching user cart:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch user cart" });
   }
 };
 
+
 // Add an item to the cart
 export const addToCart = async (req, res) => {
-  const { userId, productId, variantId, quantity } = req.body;
-  console.log(req.body)
-  if (!userId || !productId || !variantId || !quantity) {
-    return res.status(400).json({ message: "All fields are required" });
-  }
-
   try {
-    // Cari user berdasarkan userId
-    const user = await userModel.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    const { productId, variantId, quantity } = req.body;
+
+    // Ambil userId dari token yang sudah divalidasi oleh middleware
+    const userId = req.userId;
+
+    console.log("addToCart request:", { userId, productId, variantId, quantity });
+
+    // Validasi input
+    if (!userId) {
+      return res.status(401).json({ message: "User tidak terautentikasi" });
     }
 
-    // Cek apakah item dengan productId dan variantId sudah ada di cart
-    const existingItem = user.cartData.find(item => 
-      item.productId.toString() === productId && item.variantId.toString() === variantId
+    if (!productId || !variantId || !quantity || quantity < 1) {
+      return res.status(400).json({
+        message: "Invalid input. Semua field harus diisi dan quantity minimal 1.",
+      });
+    }
+
+    if (!Array.isArray(variantId) || variantId.length === 0) {
+      return res
+        .status(400)
+        .json({ message: "Variant ID harus berupa array dan tidak boleh kosong." });
+    }
+
+    // Pastikan setiap varian memiliki pasangan optionId
+    const isValidVariants = variantId.every(
+      (v) => v.variantId && v.optionId
     );
 
-    if (existingItem) {
-      // Jika item sudah ada, update quantity
-      existingItem.quantity += quantity;
+    if (!isValidVariants) {
+      return res.status(400).json({
+        message: "Setiap varian harus memiliki pasangan variantId dan optionId.",
+      });
+    }
+
+    // Ambil data user
+    const user = await userModel.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User tidak ditemukan." });
+    }
+
+    // Cari apakah item sudah ada di keranjang
+    const existingCartItem = user.cartData.find(
+      (item) =>
+        item.productId.toString() === productId &&
+        item.variants.length === variantId.length &&
+        item.variants.every((v, idx) =>
+          v.variantId.toString() === variantId[idx].variantId &&
+          v.optionId.toString() === variantId[idx].optionId
+        )
+    );
+
+    if (existingCartItem) {
+      // Jika item sudah ada di keranjang, tambahkan quantity
+      existingCartItem.quantity += quantity;
     } else {
-      // Jika item belum ada, tambahkan item baru ke cartData
-      user.cartData.push({ productId, variantId, quantity });
+      // Jika item belum ada di keranjang, tambahkan sebagai entri baru
+      user.cartData.push({ productId, variants: variantId, quantity });
     }
 
     // Simpan perubahan ke database
     await user.save();
-    await userModel.findByIdAndUpdate(userId, { cartData });
-    // Response sukses
-    res.status(200).json({ message: "Item added to cart", cartData: user.cartData });
+
+    res.status(200).json({
+      message: "Item berhasil ditambahkan ke keranjang",
+      success: true,
+      cart: user.cartData,
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error" });
+    console.error("Error in addToCart:", error);
+    
+    res.status(500).json({success: false, message: "Terjadi kesalahan server", });
   }
 };
 
@@ -214,10 +263,3 @@ export const clearCart = async (req, res) => {
 };
 
 // Export all handlers
-export default {
-  getUserCart,
-  addToCart,
-  updateCart,
-  removeFromCart,
-  clearCart,
-};

@@ -22,7 +22,11 @@ const loginUser = async (req, res) => {
     const isMatch = await bcrypt.compare(password,user.password)
 
     if(isMatch){
-        const token = createToken(user._id)
+      const token = jwt.sign(
+        { userId: user._id }, // Payload
+        process.env.JWT_SECRET, // Secret key
+        { expiresIn: "1d" } // Masa berlaku token
+      );
         res.json({success:true,token})
     }
     else{

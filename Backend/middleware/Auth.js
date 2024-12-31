@@ -1,20 +1,18 @@
 import jwt from 'jsonwebtoken';
 
-const authUser = async (req, res, next) => {
-  const { token } = req.headers;
+const authUser = (req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1]; // Ambil token dari header
 
   if (!token) {
-    return res.json({ success: false, message: 'Not Authorized Login Again' });
+    return res.status(401).json({ message: "Token tidak ditemukan. Silakan login." });
   }
 
   try {
-    const token_decode = jwt.verify(token, process.env.JWT_SECRET);
-    req.body.userId = token_decode.id; // Decode token dan tambahkan userId ke req.body
-
-    next()
+    const decoded = jwt.verify(token, process.env.JWT_SECRET); // Verifikasi token
+    req.userId = decoded.userId; // Simpan userId ke req
+    next();
   } catch (error) {
-    console.log(error);
-    res.json({ success: false, message: error.message });
+    return res.status(401).json({ message: "Token tidak valid atau sudah kedaluwarsa." });
   }
 };
 

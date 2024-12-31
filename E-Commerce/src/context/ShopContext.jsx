@@ -1,6 +1,4 @@
 import React, { createContext, useEffect, useState } from "react";
-
-
 import { FormatRupiah } from "@arismun/format-rupiah";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
@@ -9,24 +7,21 @@ import axios from "axios";
 export const ShopContext = createContext();
 
 const ShopContextProvider = (props) => {
-  const formatIDR = (amount) => {
-    return (
-      <FormatRupiah
-        value={amount}
-        decimalSeparator=","
-        thousandSeparator="."
-      />
-    );
-  };
+  const formatIDR = (amount) => (
+    <FormatRupiah
+      value={amount}
+      decimalSeparator=","
+      thousandSeparator="."
+    />
+  );
 
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
-  const [token, setToken] = useState("");
+
+  const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
-  const navigate = useNavigate();
   const [cartItems, setCartItems] = useState([]);
   const [products, setProducts] = useState([]);
-
   const [provinces, setProvinces] = useState([]);
   const [cities, setCities] = useState([]);
   const [selectedProvince, setSelectedProvince] = useState("");
@@ -34,24 +29,25 @@ const ShopContextProvider = (props) => {
   const [weight, setWeight] = useState(1);
   const [courier, setCourier] = useState("jne");
   const [cost, setCost] = useState(null);
+  const navigate = useNavigate();
 
+  // Fetch provinces
   useEffect(() => {
     const fetchProvinces = async () => {
       try {
-        const response = await axios.get(backendUrl + "/api/rajaongkir/provinces");
+        const response = await axios.get(`${backendUrl}/api/rajaongkir/provinces`);
         setProvinces(response.data.provinces);
       } catch (error) {
         console.error("Error fetching provinces:", error);
         toast.error("Failed to fetch provinces.");
       }
     };
-
     fetchProvinces();
-  }, []);
+  }, [backendUrl]);
 
   const fetchCities = async (provinceId) => {
     try {
-      const response = await axios.get(backendUrl + "/api/rajaongkir/cities/" + provinceId);
+      const response = await axios.get(`${backendUrl}/api/rajaongkir/cities/${provinceId}`);
       setCities(response.data);
     } catch (error) {
       console.error("Error fetching cities:", error);
@@ -61,176 +57,150 @@ const ShopContextProvider = (props) => {
 
   const calculateCost = async (destination, weight, courier) => {
     try {
-      const response = await axios.post(backendUrl + "/api/rajaongkir/cost", {
+      const response = await axios.post(`${backendUrl}/api/rajaongkir/cost`, {
         origin: 455,
-        destination: destination,
-        weight: weight,
-        courier: courier,
+        destination,
+        weight,
+        courier,
       });
       return response.data;
     } catch (error) {
-      console.error("Error fetching cost:", error);
+      console.error("Error calculating cost:", error);
       toast.error("Failed to calculate shipping cost.");
       return null;
     }
   };
 
-  const addToCart = async (itemId, selectedVariants) => {
+  // Add to Cart
+  const addToCart = async (productId, variantArray, quantity = 1) => {
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        return { success: false, message: "You must be logged in to add items to cart" };
-      }
-  
-      // Construct payload to send to backend
-      const payload = {
-        productId: itemId,
-        selectedVariants: selectedVariants,
-        quantity: 1, // Default quantity
-      };
-  
-      // Send data to backend
       const response = await axios.post(
         `${backendUrl}/api/cart/add`,
-        payload,
-        { headers: { Authorization: `Bearer ${token}` } }
+        {
+          productId,
+          variantId: variantArray,
+          quantity,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
       );
   
-      // Handle response from backend
-      if (response.data && response.data.success) {
-        return { success: true, message: "Item successfully added to cart" };
-      } else {
-        return { success: false, message: response.data.message || "Failed to add item to cart" };
-      }
+      return response.data; // Respons harus memiliki { success: true, cart: updatedCart }
     } catch (error) {
-      console.error("Error adding to cart:", error);
-      return { success: false, message: error.response?.data?.message || "An error occurred" };
+      console.error("Error in addToCart:", error);
+      return {
+        success: false,
+        message: error.response?.data?.message || "Failed to add product to cart.",
+      };
     }
   };
+  
   
 
   const getCartCount = () => {
-    let totalCount = 0;
-
-    for (const items in cartItems) {
-      for (const item in cartItems[items]) {
-        try {
-          if (cartItems[items][item] > 0) {
-            totalCount += cartItems[items][item];
-          }
-        } catch (error) {
-          console.error("Error calculating cart count:", error);
-        }
-      }
-    }
-
-    return totalCount;
+    return cartItems.reduce((count, item) => count + item.quantity, 0);
   };
 
   const getCartAmount = () => {
-    let totalAmount = 0;
+    return cartItems.reduce((total, item) => {
+      const product = products.find((p) => p._id === item.productId);
+      if (product) {
+        const variant = product.variants
+          ?.flatMap((v) => v.options)
+          ?.find((opt) => opt._id === item.variantId);
 
-    for (const items in cartItems) {
-      let itemInfo = products.find((product) => product._id === items);
-      for (const item in cartItems[items]) {
-        try {
-          if (cartItems[items][item] > 0) {
-            totalAmount += itemInfo.price * cartItems[items][item];
-          }
-        } catch (error) {
-          console.error("Error calculating cart amount:", error);
+        if (variant) {
+          return total + variant.price * item.quantity;
         }
       }
-    }
-
-    return totalAmount;
+      return total;
+    }, 0);
   };
 
   const getProductsData = async () => {
     try {
-      const response = await axios.get(backendUrl + "/api/product/list");
+      const response = await axios.get(`${backendUrl}/api/product/list`);
       if (response.data.success) {
-        const productsWithNumberPrice = response.data.products.map((product) => {
-          const price = Number(product.price);
-          if (isNaN(price)) {
-            console.error("Invalid price value for product:", product);
-            return { ...product, price: 0 }; // Handle invalid price
-          }
-          return { ...product, price: price };
-        });
-        setProducts(productsWithNumberPrice);
+        setProducts(response.data.products);
       } else {
         toast.error(response.data.message);
       }
     } catch (error) {
-      console.log(error);
-      toast.error(error.message);
+      console.error("Error fetching products:", error);
+      toast.error(error.message || "Failed to fetch products.");
     }
   };
 
   useEffect(() => {
     getProductsData();
-  }, []);
+  }, [backendUrl]);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const userId = localStorage.getItem("userId");
-  
-    if (token && userId) {
-      setToken(token);
-      setUserId(userId);
-    }
-  }, []);
-  
-
-  const updateQuantity = async (itemId, size, quantity) => {
-    let cartData = structuredClone(cartItems);
-    cartData[itemId][size] = quantity;
-    setCartItems(cartData);
-
     if (token) {
-      try {
-        await axios.post(backendUrl + "/api/cart/update", { itemId, size, quantity }, { headers: { token } });
-      } catch (error) {
-        console.log(error);
-        toast.error(error.message);
-      }
+      getUserCart(token);
     }
-  };
+  }, [token]);
 
-  const getUserCart = async (token) => {
+  const updateQuantity = async (cartItemId, quantity) => {
     try {
-      const response = await axios.post(backendUrl + "/api/cart/get", {}, { headers: { token } });
+      const response = await axios.post(
+        `${backendUrl}/api/cart/update`,
+        { cartItemId, quantity },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
       if (response.data.success) {
-        setCartItems(response.data.cartData);
+        setCartItems(response.data.cart); // Update cart state with the latest data
+        toast.success("Cart updated successfully!");
+      } else {
+        toast.error(response.data.message || "Failed to update cart.");
       }
     } catch (error) {
-      console.log(error);
-      toast.error(error.message);
+      console.error("Error updating cart quantity:", error);
+      toast.error(error.response?.data?.message || "Failed to update cart.");
     }
   };
 
-  const clearCart = (token) => {
-    setCartItems({});
-    if (token) {
-      axios.post(backendUrl + "/api/cart/clear", {}, { headers: { token } })
-        .then((response) => {
-          if (response.data.success) {
-            toast.success("Cart cleared successfully");
-          } else {
-            console.error("Error clearing cart:", response.data.message);
-            toast.error(response.data.message || "Failed to clear cart.");
-          }
-        })
-        .catch((error) => {
-          console.error("Error clearing cart:", error);
-          toast.error("Failed to clear cart. Please try again later.");
-        });
+  const getUserCart = async () => {
+    try {
+      const response = await axios.get(`${backendUrl}/api/cart/get`, {
+        headers: { Authorization: `Bearer ${token}` }, // Token from auth context or localStorage
+      });
+  
+      if (response.data.success) {
+        setCartItems(response.data.cartData); // Update cart data in state
+      } else {
+        toast.error(response.data.message || "Failed to fetch cart.");
+      }
+    } catch (error) {
+      console.error("Error fetching user cart:", error);
+      toast.error(error.response?.data?.message || "Failed to fetch cart.");
     }
   };
   
+
+  const clearCart = async () => {
+    try {
+      const response = await axios.post(
+        `${backendUrl}/api/cart/clear`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.success) {
+        setCartItems([]);
+        toast.success("Cart cleared successfully.");
+      } else {
+        toast.error(response.data.message || "Failed to clear cart.");
+      }
+    } catch (error) {
+      console.error("Error clearing cart:", error);
+      toast.error("Failed to clear cart. Please try again later.");
+    }
+  };
+
   const value = {
- 
     products,
     search,
     setSearch,
@@ -239,13 +209,12 @@ const ShopContextProvider = (props) => {
     cartItems,
     addToCart,
     getCartCount,
-    updateQuantity,
     getCartAmount,
+    updateQuantity,
     navigate,
     backendUrl,
     setToken,
     token,
-    setCartItems,
     provinces,
     cities,
     selectedProvince,
@@ -259,7 +228,9 @@ const ShopContextProvider = (props) => {
   };
 
   return (
-    <ShopContext.Provider value={value}>{props.children}</ShopContext.Provider>
+    <ShopContext.Provider value={value}>
+      {props.children}
+    </ShopContext.Provider>
   );
 };
 
