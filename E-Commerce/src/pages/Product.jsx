@@ -8,16 +8,16 @@ import "react-toastify/dist/ReactToastify.css";
 
 const Product = () => {
   const { productId } = useParams();
-  const { products, addToCart, formatIDR } = useContext(ShopContext);
+  const { products, addToCart, formatIDR, getCartCount } =
+    useContext(ShopContext);
   const [productData, setProductData] = useState(null);
   const [image, setImage] = useState("");
-  const [selectedVariant, setSelectedVariant] = useState(null); // Store active variant and option
+  const [selectedVariant, setSelectedVariant] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [variantPrice, setVariantPrice] = useState(0);
   const [variantStock, setVariantStock] = useState(0);
 
-  // Fetch product data
   useEffect(() => {
     if (!products.length) return;
 
@@ -25,7 +25,7 @@ const Product = () => {
     if (foundProduct) {
       setProductData(foundProduct);
       setImage(foundProduct.images?.[0] || "");
-      resetVariantState(); // Reset variant state on new product
+      resetVariantState();
     } else {
       setProductData(null);
     }
@@ -33,22 +33,22 @@ const Product = () => {
     setIsLoading(false);
   }, [productId, products]);
 
-  // Reset selected variant state
   const resetVariantState = () => {
     setSelectedVariant(null);
-    setVariantPrice(productData?.price || 0); // Default price
-    setVariantStock(productData?.stock || 0); // Default stock
+    setVariantPrice(productData?.price || 0);
+    setVariantStock(productData?.stock || 0);
   };
 
-  // Handle variant selection
   const handleVariantChange = (variantName, selectedOptionId) => {
-    // Find the selected variant and option
-    const selectedVariant = productData.variants.find((variant) => variant.name === variantName);
-    const selectedOption = selectedVariant.options.find((option) => option._id === selectedOptionId);
+    const selectedVariant = productData.variants.find(
+      (variant) => variant.name === variantName
+    );
+    const selectedOption = selectedVariant.options.find(
+      (option) => option._id === selectedOptionId
+    );
 
     if (!selectedOption) return;
 
-    // Update the selected variant
     setSelectedVariant({
       variantName,
       variantId: selectedVariant._id,
@@ -56,66 +56,56 @@ const Product = () => {
       optionName: selectedOption.name,
     });
 
-    // Update price and stock
     setVariantPrice(selectedOption.price);
     setVariantStock(selectedOption.stock);
-
-    // Update main product image
     if (selectedOption.image) setImage(selectedOption.image);
   };
 
-  // Validate variant selection
   const validateVariantSelection = () => {
-    if (!selectedVariant) {
+    if (productData?.variants?.length > 0 && !selectedVariant) {
       toast.error("Please select a variant option.");
       return false;
     }
     return true;
   };
 
-  // Handle adding product to cart
   const handleAddToCart = async () => {
     if (!productData) return;
-
-    // Validate if a variant is selected
-    if (!validateVariantSelection()) return;
-
+  
+    // Validasi varian hanya jika produk memiliki varian
+    if (productData.variants?.length > 0 && !validateVariantSelection()) return;
+    
+    setIsAddingToCart(true);
+  
     try {
-      // Prepare payload for adding to cart
       const payload = {
         productId: productData._id,
-        variantId: [
-          {
-            variantId: selectedVariant.variantId,
-            optionId: selectedVariant.optionId,
-          },
-        ],
+        variantId: productData.variants?.length > 0
+          ? [
+              {
+                variantId: selectedVariant?.variantId || null,
+                optionId: selectedVariant?.optionId || null,
+              },
+            ]
+          : [], // Kirim array kosong jika tidak ada varian
         quantity: 1,
       };
-
-      // Add to cart
-      const result = await addToCart(
-        productData._id,
-        payload.variantId,
-        payload.quantity
-      );
-
-      if (result?.success) {
-        toast.success(`${productData.name} successfully added to cart.`);
-      } else {
-        const errorMessage = result?.message || "Failed to add product to cart.";
-        toast.error(errorMessage);
-      }
+  
+      await addToCart(productData._id, payload.variantId, payload.quantity);
+  
+      toast.success(`${productData.name} added to cart.`);
     } catch (err) {
       console.error("Error in handleAddToCart:", err);
       toast.error("An error occurred while adding to cart.");
+    } finally {
+      setIsAddingToCart(false);
     }
   };
-
+  
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <p>Loading...</p>
+        Loading...
       </div>
     );
   }
@@ -123,7 +113,7 @@ const Product = () => {
   if (!productData) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <p>Product not found.</p>
+        Product not found.
       </div>
     );
   }
@@ -170,14 +160,20 @@ const Product = () => {
             </span>
           </div>
           <p className="mt-2 text-2xl font-semibold">
-            {formatIDR(variantPrice)}
+            {formatIDR(
+              productData.variants?.length > 0
+                ? variantPrice
+                : productData.price
+            )}
           </p>
+
           <p className="mt-2">
             <span className="font-semibold">Category: </span>
             {productData.category.name}
           </p>
           <p className="mt-4">{productData.description}</p>
 
+          {/* Variants */}
           {/* Variants */}
           {productData.variants?.length > 0 && (
             <div className="mt-4">
