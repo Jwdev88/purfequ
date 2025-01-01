@@ -7,19 +7,11 @@ import axios from "axios";
 export const ShopContext = createContext();
 
 const ShopContextProvider = (props) => {
-  const formatIDR = (amount) => (
-    <FormatRupiah
-      value={amount}
-      decimalSeparator=","
-      thousandSeparator="."
-    />
-  );
+  const formatIDR = (amount) => <FormatRupiah value={amount} decimalSeparator="," thousandSeparator="." />;
 
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
-
+  const navigate = useNavigate();
   const [token, setToken] = useState(localStorage.getItem("token") || "");
-  const [search, setSearch] = useState("");
-  const [showSearch, setShowSearch] = useState(false);
   const [cartItems, setCartItems] = useState([]);
   const [products, setProducts] = useState([]);
   const [provinces, setProvinces] = useState([]);
@@ -29,7 +21,6 @@ const ShopContextProvider = (props) => {
   const [weight, setWeight] = useState(1);
   const [courier, setCourier] = useState("jne");
   const [cost, setCost] = useState(null);
-  const navigate = useNavigate();
 
   // Fetch provinces
   useEffect(() => {
@@ -38,19 +29,41 @@ const ShopContextProvider = (props) => {
         const response = await axios.get(`${backendUrl}/api/rajaongkir/provinces`);
         setProvinces(response.data.provinces);
       } catch (error) {
-        console.error("Error fetching provinces:", error);
         toast.error("Failed to fetch provinces.");
       }
     };
     fetchProvinces();
   }, [backendUrl]);
 
+  // Fetch products
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const response = await axios.get(`${backendUrl}/api/product/list`);
+        if (response.data.success) {
+          setProducts(response.data.products);
+        } else {
+          toast.error(response.data.message || "Failed to fetch products.");
+        }
+      } catch (error) {
+        toast.error(error.message || "Failed to fetch products.");
+      }
+    };
+    fetchProducts();
+  }, [backendUrl]);
+
+  // Fetch cart when token is available
+  useEffect(() => {
+    if (token) {
+      getUserCart(token);
+    }
+  }, [token, backendUrl]);
+
   const fetchCities = async (provinceId) => {
     try {
       const response = await axios.get(`${backendUrl}/api/rajaongkir/cities/${provinceId}`);
       setCities(response.data);
     } catch (error) {
-      console.error("Error fetching cities:", error);
       toast.error("Failed to fetch cities.");
     }
   };
@@ -63,45 +76,50 @@ const ShopContextProvider = (props) => {
         weight,
         courier,
       });
-      return response.data;
+      setCost(response.data);
     } catch (error) {
-      console.error("Error calculating cost:", error);
       toast.error("Failed to calculate shipping cost.");
-      return null;
     }
   };
 
-  // Add to Cart
+  // Add item to cart
   const addToCart = async (productId, variantArray, quantity = 1) => {
-    try {
-      const response = await axios.post(
-        `${backendUrl}/api/cart/add`,
-        {
-          productId,
-          variantId: variantArray,
-          quantity,
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-  
-      return response.data; // Respons harus memiliki { success: true, cart: updatedCart }
-    } catch (error) {
-      console.error("Error in addToCart:", error);
-      return {
-        success: false,
-        message: error.response?.data?.message || "Failed to add product to cart.",
-      };
+    let updatedCart = structuredClone(cartItems);
+
+    const existingItemIndex = updatedCart.findIndex(
+      (item) => item.productId === productId && item.variantId === variantArray
+    );
+    if (existingItemIndex > -1) {
+      updatedCart[existingItemIndex].quantity += quantity;
+    } else {
+      updatedCart.push({ productId, variantId: variantArray, quantity });
+    }
+
+    setCartItems(updatedCart);
+
+    // Sync with backend
+    if (token) {
+      try {
+        const response = await axios.post(
+          `${backendUrl}/api/cart/add`,
+          { productId, variantId: variantArray, quantity },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        return response.data;
+      } catch (error) {
+        console.error("Error in addToCart:", error);
+        toast.error(error.response?.data?.message || "Failed to add product to cart.");
+        return { success: false };
+      }
     }
   };
-  
-  
 
+  // Get total cart count
   const getCartCount = () => {
-    return cartItems.reduce((count, item) => count + item.quantity, 0);
+    return cartItems.reduce((total, item) => total + item.quantity, 0);
   };
 
+  // Get total cart amount
   const getCartAmount = () => {
     return cartItems.reduce((total, item) => {
       const product = products.find((p) => p._id === item.productId);
@@ -109,7 +127,6 @@ const ShopContextProvider = (props) => {
         const variant = product.variants
           ?.flatMap((v) => v.options)
           ?.find((opt) => opt._id === item.variantId);
-
         if (variant) {
           return total + variant.price * item.quantity;
         }
@@ -118,68 +135,56 @@ const ShopContextProvider = (props) => {
     }, 0);
   };
 
-  const getProductsData = async () => {
-    try {
-      const response = await axios.get(`${backendUrl}/api/product/list`);
-      if (response.data.success) {
-        setProducts(response.data.products);
-      } else {
-        toast.error(response.data.message);
-      }
-    } catch (error) {
-      console.error("Error fetching products:", error);
-      toast.error(error.message || "Failed to fetch products.");
-    }
-  };
-
-  useEffect(() => {
-    getProductsData();
-  }, [backendUrl]);
-
-  useEffect(() => {
-    if (token) {
-      getUserCart(token);
-    }
-  }, [token]);
-
-  const updateQuantity = async (cartItemId, quantity) => {
-    try {
-      const response = await axios.post(
-        `${backendUrl}/api/cart/update`,
-        { cartItemId, quantity },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      if (response.data.success) {
-        setCartItems(response.data.cart); // Update cart state with the latest data
-        toast.success("Cart updated successfully!");
-      } else {
-        toast.error(response.data.message || "Failed to update cart.");
-      }
-    } catch (error) {
-      console.error("Error updating cart quantity:", error);
-      toast.error(error.response?.data?.message || "Failed to update cart.");
-    }
-  };
-
-  const getUserCart = async () => {
+  // Get user cart data from backend
+  const getUserCart = async (token) => {
     try {
       const response = await axios.get(`${backendUrl}/api/cart/get`, {
-        headers: { Authorization: `Bearer ${token}` }, // Token from auth context or localStorage
+        headers: { Authorization: `Bearer ${token}` },
       });
-  
       if (response.data.success) {
-        setCartItems(response.data.cartData); // Update cart data in state
+        setCartItems(response.data.cartData || []);
       } else {
         toast.error(response.data.message || "Failed to fetch cart.");
       }
     } catch (error) {
-      console.error("Error fetching user cart:", error);
       toast.error(error.response?.data?.message || "Failed to fetch cart.");
     }
   };
-  
 
+  // Update item quantity in cart
+  const updateQuantity = async (productId, variantId, optionId, quantity) => {
+    // Update cart locally
+    let updatedCart = structuredClone(cartItems);
+    const itemIndex = updatedCart.findIndex(
+      (item) => item.productId === productId && item.variantId === variantId && item.optionId === optionId
+    );
+  
+    if (itemIndex > -1) {
+      updatedCart[itemIndex].quantity = quantity;
+      setCartItems(updatedCart);
+  
+      // Sync with backend
+      if (token) {
+        try {
+          const response = await axios.post(
+            `${backendUrl}/api/cart/update`,
+            { productId, variantId, optionId, quantity },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          if (response.data.success) {
+            toast.success("Cart updated successfully!");
+            setCartItems(response.data.cart); // Update cart with latest backend data
+          } else {
+            toast.error(response.data.message || "Failed to update cart.");
+          }
+        } catch (error) {
+          toast.error(error.response?.data?.message || "Failed to update cart.");
+        }
+      }
+    }
+  };
+  
+  // Clear cart
   const clearCart = async () => {
     try {
       const response = await axios.post(
@@ -187,7 +192,6 @@ const ShopContextProvider = (props) => {
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
       if (response.data.success) {
         setCartItems([]);
         toast.success("Cart cleared successfully.");
@@ -195,26 +199,21 @@ const ShopContextProvider = (props) => {
         toast.error(response.data.message || "Failed to clear cart.");
       }
     } catch (error) {
-      console.error("Error clearing cart:", error);
-      toast.error("Failed to clear cart. Please try again later.");
+      toast.error("Failed to clear cart.");
     }
   };
 
+  // Context value
   const value = {
     products,
-    search,
-    setSearch,
-    showSearch,
-    setShowSearch,
     cartItems,
     addToCart,
     getCartCount,
     getCartAmount,
     updateQuantity,
-    navigate,
-    backendUrl,
-    setToken,
-    token,
+    formatIDR,
+    clearCart,
+    calculateCost,
     provinces,
     cities,
     selectedProvince,
@@ -222,16 +221,13 @@ const ShopContextProvider = (props) => {
     selectedCity,
     setSelectedCity,
     fetchCities,
-    calculateCost,
-    formatIDR,
-    clearCart,
+    navigate,
+    setToken,
+    token,
+    backendUrl,
   };
 
-  return (
-    <ShopContext.Provider value={value}>
-      {props.children}
-    </ShopContext.Provider>
-  );
+  return <ShopContext.Provider value={value}>{props.children}</ShopContext.Provider>;
 };
 
 export default ShopContextProvider;
