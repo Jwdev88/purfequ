@@ -1,25 +1,61 @@
 import mongoose from "mongoose";
 
+// Skema untuk Item Keranjang (cartItemSchema)
 const cartItemSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
-  variants: [
-    {
-      variantId: { type: mongoose.Schema.Types.ObjectId, ref: "Variant", required: true }, // ID Varian
-      optionId: { type: mongoose.Schema.Types.ObjectId, required: true }, // ID Opsi
-    }
-  ],
-  quantity: { type: Number, required: true, default: 1 }, // Jumlah item di keranjang
+  variantId: { type: mongoose.Schema.Types.ObjectId, ref: "Variant" }, // opsional untuk produk tanpa varian
+  optionId: { type: mongoose.Schema.Types.ObjectId }, // opsional untuk produk tanpa varian
+  quantity: { type: Number, required: true, default: 1 },
 });
 
+// Skema untuk Alamat Pengguna (addressSchema)
+const addressSchema = new mongoose.Schema({
+  firstName: { type: String, required: true },
+  lastName: { type: String, required: true },
+  email: { type: String, required: true },
+  phone: { type: String, required: true },
+  street: { type: String, required: true },
+  city: { type: String, required: true },
+  state: { type: String, required: true },
+  postalCode: { type: String, required: true },
+});
 
+// Skema User dengan cartData dan address
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, unique: true, required: true },
   password: { type: String, required: true },
   cartData: {
-    type: [cartItemSchema],
-    default: [], // Array default kosong
+    type: [cartItemSchema], // Item-item di keranjang
+    default: [],
   },
+  addresses: [addressSchema], // Alamat-alamat pengguna
 });
+
+// Metode untuk mempopulasi cartData dengan Product, Variant, dan Option terkait
+userSchema.methods.populateCart = async function () {
+  return this.populate({
+    path: "cartData.productId", // Populasi produk
+    select: "name description images stock price sku weight variants category subCategory", // Ambil detail dari produk
+    populate: [
+      {
+        path: "category", // Populasi kategori
+        select: "name", // Ambil nama kategori
+      },
+      {
+        path: "subCategory", // Populasi subkategori
+        select: "name", // Ambil nama subkategori
+      },
+      {
+        path: "variants", // Variants ada di dalam produk
+        select: "name options", // Ambil nama dan opsi dari setiap variant
+        populate: {
+          path: "options.optionId", // Populasi optionId dalam opsi varian
+          select: "name price stock sku weight", // Ambil detail dari opsi
+        },
+      },
+    ],
+  });
+};
 
 export default mongoose.model("User", userSchema);

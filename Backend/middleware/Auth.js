@@ -1,19 +1,26 @@
 import jwt from 'jsonwebtoken';
+import User from '../models/userModel.js';
 
-const authUser = (req, res, next) => {
-  const token = req.headers.authorization?.split(" ")[1]; // Ambil token dari header
-
-  if (!token) {
-    return res.status(401).json({ message: "Token tidak ditemukan. Silakan login." });
-  }
-
+export const authUser = async (req, res, next) => {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET); // Verifikasi token
-    req.userId = decoded.userId; // Simpan userId ke req
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ success: false, message: "No token provided" });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    req.user = user; // Set user data on request
     next();
   } catch (error) {
-    return res.status(401).json({ message: "Token tidak valid atau sudah kedaluwarsa." });
+    console.error("Authentication error:", error);
+    res.status(401).json({ success: false, message: "Authentication failed" });
   }
 };
+
 
 export default authUser;

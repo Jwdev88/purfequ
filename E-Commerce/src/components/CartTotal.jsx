@@ -3,7 +3,8 @@ import { ShopContext } from '../context/ShopContext'
 import Title from './Title'
 
 const CartTotal = () => {
-  const { getCartAmount, formatIDR } = useContext(ShopContext)
+  const { getCartAmount, formatIDR } = useContext(ShopContext);
+  const totalAmount = getCartAmount(); 
 
 
 
@@ -15,7 +16,7 @@ const CartTotal = () => {
       <div className='flex flex-col gap-2 mt-2 text-sm'>
         <div className='flex justify-between'>
           <p>SubTotal Pesanan</p>
-          <p>{formatIDR(getCartAmount())}</p>
+          <p>{formatIDR(totalAmount)}</p>
         </div>
         <hr />
       </div>

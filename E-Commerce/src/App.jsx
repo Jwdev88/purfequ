@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useReducer } from 'react'
 import {BrowserRouter, Routes,Route } from 'react-router-dom'
 import Home from './pages/Home'
 import Collection from './pages/Collection'
@@ -15,11 +15,29 @@ import SearchBar from './components/SearchBar'
 
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+
+const initialState = {
+  isLogin: false,
+}
+
+const reducer = (state, action) => {
+  switch (action.type) {
+    case 'LOGIN':
+      return { ...state, isLogin: true }
+    case 'LOGOUT':
+      return { ...state, isLogin: false }
+    default:
+      return state
+  }
+}
+
 const App = () => {
+  const [state, dispatch] = useReducer(reducer, initialState)
+
   return (
     <div className='px-1 sm:px-[5vw] md:px-[7vw] lg:px-[9vw]'>
       <ToastContainer/>
-      <Navbar/>
+      <Navbar isLogin={state.isLogin} dispatch={dispatch}/>
       <SearchBar/>
       <Routes>
         <Route path='/' element={<Home/>}/>
@@ -28,12 +46,9 @@ const App = () => {
         <Route path='contact' element={<Contact/>}/>
         <Route path='product/:productId' element={<Product />} /> 
         <Route path='cart' element={<Cart/>}/>
-        <Route path='login' element={<Login/>}/>
+        <Route path='login' element={<Login dispatch={dispatch}/>}/>
         <Route path='place-order' element={<PlaceOrder/>}/>
-        <Route path='orders' element={<Orders/>}/>   
-    
-
-      
+        <Route path='orders' element={<Orders/>}/>  
       </Routes>
       <Footer/>
     </div>

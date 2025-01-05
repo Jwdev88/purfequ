@@ -1,269 +1,221 @@
-import userModel from "../models/userModel.js";
-import Joi from "joi";
+import User from "../models/userModel.js";
 import mongoose from "mongoose";
-// Helper function for standardized error responses
-const handleError = (
-  res,
-  error,
-  message = "An error occurred",
-  status = 500
-) => {
-  console.error(message, error);
-  res.status(status).json({ success: false, message });
-};
+import product from "../models/productModel.js";
+const populateCartData = (user) => {
+  return user.cartData.map(item => {
+    const product = item.productId;
+    let selectedVariant = null;
+    let selectedOption = null;
 
-// Validation schema using Joi
-const validateCartInput = (data, requireVariant = false) => {
-  const schema = Joi.object({
-    userId: Joi.string()
-      .regex(/^[0-9a-fA-F]{24}$/)
-      .required(), // Validate MongoDB ObjectId
-    productId: Joi.string()
-      .regex(/^[0-9a-fA-F]{24}$/)
-      .required(),
-    variantId: requireVariant
-      ? Joi.array()
-          .items(
-            Joi.object({
-              variantId: Joi.string()
-                .regex(/^[0-9a-fA-F]{24}$/)
-                .required(),
-              optionId: Joi.string()
-                .regex(/^[0-9a-fA-F]{24}$/)
-                .required(),
-            })
-          )
-          .required()
-      : Joi.array().optional(),
-    quantity: Joi.number().integer().min(1).optional(),
+    if (product.variants && product.variants.length > 0 && item.variantId) {
+      selectedVariant = product.variants.find(variant => variant._id.toString() === item.variantId.toString());
+
+      if (selectedVariant && selectedVariant.options && selectedVariant.options.length > 0 && item.optionId) {
+        selectedOption = selectedVariant.options.find(option => option._id.toString() === item.optionId.toString());
+      }
+    }
+
+    return {
+      productId: product._id,
+      productName: product.name,
+      productDescription: product.description,
+      productCategory: product.category ? product.category.name : null,
+      productSubCategory: product.subCategory ? product.subCategory.name : null,
+      productImages: product.images,
+      productPrice: product.price,
+      productStock: product.stock,
+      productBestSeller: product.bestSeller,
+      quantity: item.quantity,
+      variant: selectedVariant ? {
+        variantId: selectedVariant._id,
+        variantName: selectedVariant.name,
+        selectedOption: selectedOption ? {
+          optionId: selectedOption._id,
+          optionName: selectedOption.name,
+          optionPrice: selectedOption.price,
+          optionStock: selectedOption.stock,
+          optionSku: selectedOption.sku,
+          optionWeight: selectedOption.weight,
+        } : null,
+      } : null,
+    };
   });
-  return schema.validate(data);
 };
 
-// Fetch user cart
 export const getUserCart = async (req, res) => {
   try {
-    const userId = req.params.userId || req.body.userId || req.userId;
+    const userId = req.user._id || req.params.userId || req.query.userId;
 
-    // Log untuk memastikan sumber userId
-    console.log("Request Params:", req.params);
-    console.log("Request Body:", req.body);
-    console.log("Request Headers:", req.headers);
-    // Validasi format ObjectId
     if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid userId format" });
+      return res.status(400).json({ success: false, message: "Invalid userId" });
     }
-    // Validasi apakah userId ada
-    if (!userId) {
-      return res
-        .status(400)
-        .json({ success: false, message: "UserId is required" });
-    }
-    // Ambil data user beserta data produk dan varian yang dirujuk di keranjang
-    const user = await userModel.findById(userId).populate({
-      path: "cartData.productId", // Populate produk di keranjang
-      model: "product", // Pastikan sesuai dengan nama model `Product`
-      populate: {
-        path: "variants.options", // Populate opsi varian jika diperlukan
-      },
-    });
+
+    const user = await User.findById(userId).select('cartData');
 
     if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
+      return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    res.status(200).json({ success: true, cartData: user.cartData });
+    const populatedUser = await user.populateCart();
+    const mappedCartData = populateCartData(populatedUser);
+
+    res.status(200).json({
+      success: true,
+      cartData: mappedCartData,
+    });
   } catch (error) {
-    console.error("Error fetching user cart:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch user cart" });
+    console.error("Error fetching cart data:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch user cart" });
   }
 };
 
-// Add an item to the cart
+
 export const addToCart = async (req, res) => {
   try {
-    const userId = req.userId;
-    const { productId, variantId, quantity } = req.body;
+    const { productId, variantId, optionId, quantity = 1 } = req.body;
 
-    const { error } = validateCartInput(
-      { userId, productId, variantId, quantity },
-      true
-    );
-    if (error)
-      return res
-        .status(400)
-        .json({ success: false, message: error.details[0].message });
+    if (!req.user) {
+      return res.status(400).json({ success: false, message: "User not authenticated" });
+    }
 
-    const user = await userModel.findById(userId);
-    if (!user)
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
+    const fetchedProduct = await product.findById(productId).populate('variants.options.optionId');
+    
+    if (!fetchedProduct) {
+      return res.status(404).json({ success: false, message: "Product not found" });
+    }
 
-    // Check if item exists in cart
-    const existingCartItem = user.cartData.find(
-      (item) =>
-        item.productId.toString() === productId &&
-        item.variants.length === variantId.length &&
-        item.variants.every(
-          (v, idx) =>
-            v.variantId.toString() === variantId[idx].variantId &&
-            v.optionId.toString() === variantId[idx].optionId
-        )
+    const existingCartItem = req.user.cartData.find(item => 
+      item.productId.equals(productId) &&
+      (!variantId || item.variantId?.equals(variantId)) &&
+      (!optionId || item.optionId?.equals(optionId))
     );
 
     if (existingCartItem) {
-      existingCartItem.quantity += quantity; // Update quantity
+      existingCartItem.quantity += quantity;
     } else {
-      user.cartData.push({ productId, variants: variantId, quantity }); // Add new item
+      const cartItem = {
+        productId,
+        quantity,
+      };
+
+      if (fetchedProduct.variants && fetchedProduct.variants.length > 0) {
+        if (!variantId || !optionId) {
+          return res.status(400).json({
+            success: false,
+            message: "variantId and optionId are required for products with variants",
+          });
+        }
+        cartItem.variantId = variantId;
+        cartItem.optionId = optionId;
+      }
+
+      req.user.cartData.push(cartItem);
     }
 
-    await user.save();
-    res.status(200).json({
+    await req.user.save();
+    const populatedUser = await req.user.populateCart();
+    const mappedCartData = populateCartData(populatedUser);
+
+    return res.status(200).json({
       success: true,
       message: "Item added to cart",
-      cart: user.cartData,
+      cartData: mappedCartData, // Kembalikan data keranjang yang sudah dipopulasi
     });
   } catch (error) {
-    handleError(res, error, "Failed to add item to cart");
+    console.error("Error adding to cart:", error);
+    res.status(500).json({ success: false, message: "Failed to add item to cart" });
   }
 };
 
-// Update cart item quantity
-
 export const updateCart = async (req, res) => {
   try {
-    const { productId, variantId, quantity } = req.body;
-    const userId = req.userId; // Assuming userId is set in the request
+    const userId = req.user?._id || req.params.userId || req.query.userId;
+    const { productId, variantId, optionId, quantity } = req.body;
 
-    // Ensure variantId is an array of objects, and each object has "variantId" and "optionId"
-    if (
-      !Array.isArray(variantId) ||
-      !variantId.every((v) => v.variantId && v.optionId)
-    ) {
+    if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(productId)) {
       return res.status(400).json({
         success: false,
-        message:
-          '"variantId" must be an array of objects with both "variantId" and "optionId" fields',
+        message: "Invalid userId or productId",
       });
     }
 
-    // Validate input
-    if (!productId || !variantId || quantity === undefined) {
+    if (quantity == null || quantity < 0) {
       return res.status(400).json({
         success: false,
-        message: '"productId", "variantId", and "quantity" are required',
+        message: "Quantity must be a non-negative number",
       });
     }
 
-    // Find the user
-    const user = await userModel.findById(userId);
+    const user = await User.findById(userId);
     if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
     }
 
-    // Find the matching cart item
-    const itemIndex = user.cartData.findIndex(
-      (item) =>
-        item.productId.toString() === productId &&
-        item.variants.some(
-          (variant) =>
-            variant.variantId.toString() === variantId[0].variantId &&
-            variant.optionId.toString() === variantId[0].optionId
-        )
+    const existingCartItem = user.cartData.find((item) => 
+      item.productId.toString() === productId &&
+      (!variantId || item.variantId?.toString() === variantId) &&
+      (!optionId || item.optionId?.toString() === optionId)
     );
 
-    if (itemIndex === -1) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Item not found in cart" });
+    if (existingCartItem) {
+      if (quantity === 0) {
+        user.cartData = user.cartData.filter((item) => item !== existingCartItem);
+      } else {
+        existingCartItem.quantity = quantity;
+      }
+    } else {
+      if (quantity > 0) {
+        user.cartData.push({
+          productId,
+          variantId: variantId || null,
+          optionId: optionId || null,
+          quantity,
+        });
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "Cannot add an item with quantity 0",
+        });
+      }
     }
 
-    // Update the quantity
-    user.cartData[itemIndex].quantity = quantity;
-
-    // Save the updated cart
     await user.save();
+    const populatedUser = await user.populateCart();
+    const mappedCartData = populateCartData(populatedUser);
 
-    // Send the updated cart data in the response
     res.status(200).json({
       success: true,
       message: "Cart updated successfully",
-      cart: user.cartData, // Return the updated cart data
+      cartItems: mappedCartData, // Kembalikan data keranjang yang sudah dipopulasi
     });
   } catch (error) {
     console.error("Error updating cart:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to update cart",
+      message: "Server error while updating cart",
+      error: error.message,
     });
   }
 };
 
-// Remove an item from the cart
-export const removeFromCart = async (req, res) => {
-  try {
-    const { productId, variantId } = req.body;
-    const userId = req.userId;
-
-    const { error } = validateCartInput({ userId, productId, variantId }, true);
-    if (error)
-      return res
-        .status(400)
-        .json({ success: false, message: error.details[0].message });
-
-    const user = await userModel.findById(userId);
-    if (!user)
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
-
-    user.cartData = user.cartData.filter(
-      (item) =>
-        !(
-          item.productId.toString() === productId &&
-          item.variants.every(
-            (v, idx) =>
-              v.variantId.toString() === variantId[idx].variantId &&
-              v.optionId.toString() === variantId[idx].optionId
-          )
-        )
-    );
-
-    await user.save();
-    res.status(200).json({
-      success: true,
-      message: "Item removed from cart",
-      cart: user.cartData,
-    });
-  } catch (error) {
-    handleError(res, error, "Failed to remove item from cart");
-  }
-};
 
 // Clear user's cart
 export const clearCart = async (req, res) => {
   try {
-    const userId = req.userId;
+    const userId = req.user._id || req.params.userId || req.query.userId;
 
-    const user = await userModel.findByIdAndUpdate(
-      userId,
-      { cartData: [] },
-      { new: true }
-    );
-
-    if (!user)
+    const user = await User.findById(userId);
+    if (!user) {
       return res
         .status(404)
         .json({ success: false, message: "User not found" });
+    }
+
+    user.cartData = [];
+    await user.save();
 
     res.status(200).json({
       success: true,
