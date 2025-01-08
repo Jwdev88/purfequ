@@ -1,4 +1,5 @@
 import React, { useContext, useMemo } from "react";
+import { Box, Flex, VStack, Text, Grid, GridItem, useColorModeValue, Container, Heading } from "@chakra-ui/react";
 import { ShopContext } from "../context/ShopContext";
 import Title from "./Title";
 import ProductItem from "./ProductItem";
@@ -12,35 +13,35 @@ const BestSeller = () => {
     return products.filter((product) => product.bestSeller).slice(0, 5);
   }, [products]);
 
-  return (
-    <div className="my-10">
-      {/* Section Title */}
-      <div className="text-center text-3x1 py-8">
-        <Title text1={"BEST"} text2={"SELLERS"} />
-        <p className="w-3/4 m-auto text-xs sm:text-sm md:text-base text-gray-600">
-          Discover our best-selling products carefully selected to meet your needs. Quality and satisfaction guaranteed!
-        </p>
-      </div>
+  const textColor = useColorModeValue("gray.700", "gray.200");
 
-      {/* Rendering Best Products */}
-      {bestSellers.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 gap-y-6">
-          {bestSellers.map((product) => (
-            <ProductItem
-              key={product._id}
-              id={product._id}
-              image={product.image}
-              name={product.name}
-              price={product.price}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="text-center text-gray-500 mt-10">
-          <p>No best-selling products found.</p>
-        </div>
-      )}
-    </div>
+  return (
+    <Box py={10} px={4}>
+      <Container maxW="container.xl">
+        <VStack spacing={8} textAlign="center">
+          <Heading as="h2" size="xl" color={textColor}>
+            <Title text1="BEST" text2="SELLERS" />
+          </Heading>
+
+        </VStack>
+        {/* Rendering Best Products */}
+        {bestSellers.length > 0 ? (
+          <Grid
+            templateColumns={{ base: "repeat(2, 1fr)", sm: "repeat(3, 1fr)", md: "repeat(4, 1fr)", lg: "repeat(5, 1fr)" }}
+            gap={6}
+            mt={8}
+          >
+            {bestSellers.map((product) => (
+              <GridItem key={product._id}>
+                <ProductItem id={product._id} image={product.image} name={product.name} price={product.price} />
+              </GridItem>
+            ))}
+          </Grid>
+        ) : (
+          <Text>No products found.</Text>
+        )}
+      </Container>
+    </Box>
   );
 };
 

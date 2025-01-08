@@ -1,72 +1,118 @@
-import React, { useContext, useMemo } from "react";
+import React, { useContext, useReducer, useEffect } from "react";
+import {
+  Box,
+  Image,
+  Text,
+  HStack,
+  LinkBox,
+  LinkOverlay,
+  useColorModeValue,
+} from "@chakra-ui/react";
 import { ShopContext } from "../context/ShopContext";
-import { Link } from "react-router-dom";
+import { Link as RouterLink } from "react-router-dom";
 import { Sparkles } from "lucide-react";
+
+// Initial state for the product
+const initialState = {
+  product: null,
+  catagory: null,
+  subCatagory: null,
+  variantPrices: [],
+};
+
+// Reducer function to manage product state
+const reducer = (state, action) => {
+  switch (action.type) {
+    case "SET_PRODUCT":
+      return {
+        ...state,
+        product: action.payload,
+        catagory: action.payload.catagory,
+        subCatagory: action.payload.subCatagory,
+        variantPrices: action.payload?.variants?.flatMap((variant) =>
+          variant.options.map((option) => option.price)
+        ) || [],
+      };
+    default:
+      return state;
+  }
+};
 
 const ProductItem = ({ id }) => {
   const { formatIDR, products } = useContext(ShopContext);
+  const [state, dispatch] = useReducer(reducer, initialState);
 
-  // Menggunakan useMemo untuk mendapatkan produk berdasarkan id
-  const product = useMemo(() => {
-    return products.find((item) => item._id === id) || null;
+  // Fetch product data and update state
+  useEffect(() => {
+    const fetchedProduct = products.find((item) => item._id === id);
+    dispatch({ type: "SET_PRODUCT", payload: fetchedProduct });
+    console.log(fetchedProduct);
   }, [products, id]);
 
-  // Fungsi untuk mendapatkan rentang harga varian
-  const getVariantPrices = useMemo(() => {
-    if (!product?.variants?.length) return [];
+  const { product, variantPrices } = state;
 
-    return product.variants.flatMap((variant) =>
-      variant.options.map((option) => option.price)
-    );
-  }, [product]);
-
-  if (!product) return null; // Early return jika produk tidak ditemukan
+  if (!product) return null;
 
   return (
-    <Link
-      to={`/product/${id}`}
-      className="block hover:shadow-lg rounded-md overflow-hidden transition-shadow"
+    <LinkBox
+      as="article"
+      rounded="md"
+      overflow="hidden"
+      boxShadow="md"
+      borderWidth="1px"
+      borderColor="gray.200"
+      bg="white"
+      transition="shadow 0.3s"
+      _hover={{ shadow: "lg" }}
       title={product.name}
     >
-      {/* Gambar Produk */}
-      <div className="relative">
-        <img
-          src={product.images?.[0] || ""}
-          alt={product.name}
-          className="w-full h-60 object-cover"
-        />
-        <div className="absolute bottom-0 left-0 bg-white p-2 rounded-bl-md">
-          <p className="text-gray-800 font-semibold">
-            {getVariantPrices.length > 0 ? (
+      <LinkOverlay as={RouterLink} to={`/product/${id}`}>
+        <Box position="relative" height="60">
+          <Image
+            src={product.images?.[0] || "default-image-url.jpg"}
+            alt={product.name}
+            width="full"
+            height="full"
+            objectFit="cover"
+          />
+        </Box>
+
+        <Box p={2}>
+          <Text
+            fontWeight="semibold"
+            fontSize="sm"
+            isTruncated
+            color={useColorModeValue("gray.800", "white")}
+            alt={product.name}
+          >
+            {product.name}
+          </Text>
+          <Text fontWeight="bold" color="gray.800">
+            {variantPrices.length > 0 ? (
               <>
-                {formatIDR(Math.min(...getVariantPrices))} -{" "}
-                {formatIDR(Math.max(...getVariantPrices))}
+                {formatIDR(Math.min(...variantPrices))} -{" "}
+                {formatIDR(Math.max(...variantPrices))}
               </>
             ) : (
               formatIDR(product.price || 0)
             )}
-          </p>
-        </div>
-      </div>
+          </Text>
 
-      {/* Informasi Produk */}
-      <div className="p-2">
-        <h2 className="font-semibold text-sm truncate">{product.name}</h2>
-        <div className="mt-1 flex items-center">
-          {/* Rating Produk */}
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Sparkles
-              key={i}
-              className={`w-5 h-5 ${
-                i < Math.floor(product.rating)
-                  ? "text-yellow-400"
-                  : "text-gray-300"
-              }`}
-            />
-          ))}
-        </div>
-      </div>
-    </Link>
+          <HStack mt={1} alignItems="center">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Sparkles
+                key={i}
+                className={`w-5 h-5 ${
+                  i < Math.floor(product.rating)
+                    ? "text-yellow-400"
+                    : "text-gray-300"
+                }`}
+              />
+            ))}
+          </HStack>
+        </Box>
+      </LinkOverlay>
+    </LinkBox>
   );
 };
 

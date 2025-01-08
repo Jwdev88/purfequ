@@ -31,7 +31,7 @@ const Login = () => {
 
   // Cek token dari context saat komponen dimuat
   useEffect(() => {
-    console.log('Token di context:', token);
+    // console.log('Token di context:', token);
   }, [token]);  // Menyimak token jika berubah
 
   const onSubmitHandler = async (event) => {
@@ -60,6 +60,8 @@ const Login = () => {
           // Set token ke context dan localStorage
           globalDispatch({ type: 'SET_TOKEN', payload: response.data.token });
           setToken(response.data.token);  // Simpan token di localStorage
+          localStorage.setItem('token', response.data.token);
+          console.log('Token yang diterima:', response.data.token);
           navigate('/');  // Redirect setelah login sukses
         } else {
           toast.error(response.data.message);

@@ -46,7 +46,7 @@ const placeOrderMidtrans = async (req, res) => {
     const { userId, items, amount, address } = req.body;
 
     // Basic validation (add more as needed)
-    if (!userId || !items || !amount || !address) {
+    if (!userId) {
       return res.status(400).json({
         success: false,
         message: "Missing required information",
@@ -78,12 +78,12 @@ const placeOrderMidtrans = async (req, res) => {
       credit_card: {
         secure: true,
       },
-      customer_details: {
-        first_name: address.firstName,
-        last_name: address.lastName,
-        phone: address.phone,
-        email: address.email,
-      },
+      // customer_details: {
+      //   first_name: address.firstName,
+      //   last_name: address.lastName,
+      //   phone: address.phone,
+      //   email: address.email,
+      // },
     };
 
     // Generate token Midtrans Snap
@@ -92,9 +92,9 @@ const placeOrderMidtrans = async (req, res) => {
     const orderData = {
       orderId: order_id, // Use the generated UUID
       userId,
-      items,
-      address,
-      amount,
+      // items,
+      // address,
+      // amount,
       paymentMethod: "Midtrans",
       payment: false,
       transactionToken: transactionToken.token,

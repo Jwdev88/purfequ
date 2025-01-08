@@ -1,4 +1,4 @@
-import { useReducer, useCallback } from "react";
+import { useReducer, useCallback, useEffect, useMemo } from "react";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { actionTypes } from "../context/actionTypes";
@@ -19,6 +19,7 @@ const initialState = {
   method: "cod",
   isLoadingCost: false,
   cities: [],
+  provinces: [],
 };
 
 const reducer = (state, action) => {
@@ -41,6 +42,8 @@ const reducer = (state, action) => {
       return { ...state, isLoadingCost: action.payload };
     case actionTypes.SET_CITIES:
       return { ...state, cities: action.payload };
+    case actionTypes.SET_PROVINCES:
+      return { ...state, provinces: action.payload };
     default:
       return state;
   }
@@ -50,18 +53,68 @@ const usePlaceOrder = (initialCartItems, backendUrl, token) => {
   const [state, dispatch] = useReducer(reducer, initialState);
   const navigate = useNavigate();
 
+  const citiesCache = useMemo(() => new Map(), []);
+
+  const fetchProvinces = useCallback(async () => {
+    try {
+      const response = await apiCall(`${backendUrl}/api/rajaongkir/provinces`);
+      dispatch({ type: actionTypes.SET_PROVINCES, payload: response.data.provinces });
+    } catch (error) {
+      toast.error("Failed to fetch provinces.");
+    }
+  }, [backendUrl]);
+
+  useEffect(() => {
+    fetchProvinces();
+  }, [fetchProvinces]);
+
   const fetchCities = useCallback(async (provinceId) => {
+    if (citiesCache.has(provinceId)) {
+      console.log("Menggunakan data kota dari cache.");
+      dispatch({ type: actionTypes.SET_CITIES, payload: citiesCache.get(provinceId) });
+      return;
+    }
+
+    console.log("Fetching cities for province:", provinceId);
     dispatch({ type: actionTypes.SET_LOADING, payload: true });
     try {
       const response = await apiCall(`${backendUrl}/api/rajaongkir/cities/${provinceId}`);
-      dispatch({ type: actionTypes.SET_CITIES, payload: response.data.cities });
+      console.log("Cities response:", response.data);
+
+      const cities = response.data || [];
+      console.log("Processed cities:", cities);
+      
+      citiesCache.set(provinceId, cities);
+      dispatch({ type: actionTypes.SET_CITIES, payload: cities });
     } catch (error) {
-      toast.error("Gagal mengambil data kota.");
+      toast.error("Failed to fetch cities.");
+      dispatch({ type: actionTypes.SET_CITIES, payload: [] });
     } finally {
       dispatch({ type: actionTypes.SET_LOADING, payload: false });
     }
-  }, [backendUrl]);
-  
+  }, [backendUrl, citiesCache]);
+
+  const handleProvinceChange = useCallback((provinceId) => {
+    dispatch({ type: actionTypes.SET_SELECTED_PROVINCE, payload: provinceId });
+    dispatch({
+      type: actionTypes.SET_FORM_DATA,
+      payload: { selectedProvince: provinceId },
+    });
+    fetchCities(provinceId);
+    dispatch({ type: actionTypes.SET_SELECTED_CITY, payload: "" });
+    dispatch({
+      type: actionTypes.SET_FORM_DATA,
+      payload: { selectedCity: "" },
+    });
+  }, [fetchCities]);
+
+  const handleCityChange = (cityId) => {
+    dispatch({ type: actionTypes.SET_SELECTED_CITY, payload: cityId });
+    dispatch({
+      type: actionTypes.SET_FORM_DATA,
+      payload: { selectedCity: cityId },
+    });
+  };
 
   const calculateShippingCost = useCallback(async () => {
     dispatch({ type: actionTypes.SET_LOADING_COST, payload: true });
@@ -77,7 +130,7 @@ const usePlaceOrder = (initialCartItems, backendUrl, token) => {
         },
         token
       );
-      dispatch({ type: actionTypes.SET_COST, payload: response.data.costs });
+      dispatch({ type: actionTypes.SET_COST, payload: response.data });
     } catch (error) {
       toast.error("Gagal menghitung biaya pengiriman.");
     } finally {
@@ -85,29 +138,32 @@ const usePlaceOrder = (initialCartItems, backendUrl, token) => {
     }
   }, [state.selectedProvince, state.selectedCity, token, backendUrl]);
 
-  const handleProvinceChange = (provinceId) => {
-    dispatch({ type: actionTypes.SET_SELECTED_PROVINCE, payload: provinceId });
-    fetchCities(provinceId);
-    dispatch({ type: actionTypes.SET_SELECTED_CITY, payload: "" });
-  };
-
-  const handleCityChange = (cityId) => {
-    dispatch({ type: actionTypes.SET_SELECTED_CITY, payload: cityId });
-  };
+  useEffect(() => {
+    if (state.selectedCity) {
+      calculateShippingCost();
+    }
+  }, [state.selectedCity, calculateShippingCost]);
 
   const handleSubmit = async (orderItems, formData) => {
     try {
       const orderData = {
         address: formData,
         items: orderItems,
-        amount: orderItems.reduce((total, item) => total + item.totalPrice, 0) + (state.selectedService ? state.selectedService.cost[0].value : 0),
+        amount:
+          orderItems.reduce((total, item) => total + item.totalPrice, 0) +
+          (state.selectedService ? state.selectedService.cost[0].value : 0),
         shippingService: state.selectedService,
       };
 
       let response;
       switch (state.method) {
         case "cod":
-          response = await apiCall(`${backendUrl}/api/order/place`, "POST", orderData, token);
+          response = await apiCall(
+            `${backendUrl}/api/order/place`,
+            "POST",
+            orderData,
+            token
+          );
           if (response.data.success) {
             navigate("/orders");
             toast.success("Order placed successfully!");
@@ -117,7 +173,12 @@ const usePlaceOrder = (initialCartItems, backendUrl, token) => {
           break;
 
         case "midtrans":
-          response = await apiCall(`${backendUrl}/api/order/midtrans`, "POST", orderData, token);
+          response = await apiCall(
+            `${backendUrl}/api/order/midtrans`,
+            "POST",
+            orderData,
+            token
+          );
           if (response.data.success) {
             window.snap.pay(response.data.token, {
               onSuccess: () => {

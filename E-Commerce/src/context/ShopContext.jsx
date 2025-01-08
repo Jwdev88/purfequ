@@ -10,33 +10,16 @@ import "react-toastify/dist/ReactToastify.css";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { actionTypes as shopActionTypes } from "./actionTypes";
-import usePlaceOrder from "../hooks/usePlaceOrder.js";
 
 export const ShopContext = createContext();
 
 const initialState = {
-  token: "",
+  token: localStorage.getItem("token") || "",
   cartItems: [],
+  categories: [],
+  subCategories: [],
   products: [],
-  provinces: [],
-  cities: [],
-  weight: 1,
-  courier: "jne",
-  cost: null,
   isLoading: false,
-  formData: {
-    firstName: "",
-    lastName: "",
-    email: "",
-    alamat: "",
-    city: "",
-    state: "",
-    kodepos: "",
-    phone: "",
-  },
-  selectedService: null,
-  method: "cod",
-  isLoadingCost: false,
 };
 
 const reducer = (state, action) => {
@@ -60,27 +43,21 @@ const reducer = (state, action) => {
       };
     case shopActionTypes.CLEAR_CART:
       return { ...state, cartItems: [] };
-    case shopActionTypes.SET_PROVINCES:
-      return { ...state, provinces: action.payload };
     case shopActionTypes.SET_PRODUCTS:
       return { ...state, products: action.payload || [] };
+    case shopActionTypes.SET_CATEGORIES:
+      return { ...state, categories: action.payload }; // Added case for setting categories
+    case shopActionTypes.SET_SUBCATEGORIES:
+      return { ...state, subCategories: action.payload };
     case shopActionTypes.SET_CART_ITEMS:
       return { ...state, cartItems: action.payload };
-    case shopActionTypes.SET_CITIES:
-      return { ...state, cities: action.payload };
-    case shopActionTypes.SET_COST:
+
       return { ...state, cost: action.payload };
     case shopActionTypes.SET_TOKEN:
       return { ...state, token: action.payload };
     case shopActionTypes.SET_LOADING:
       return { ...state, isLoading: action.payload };
-    case shopActionTypes.SET_FORM_DATA:
-      return { ...state, formData: { ...state.formData, ...action.payload } };
-    case shopActionTypes.SET_SELECTED_SERVICE:
-      return { ...state, selectedService: action.payload };
-    case shopActionTypes.SET_METHOD:
-      return { ...state, method: action.payload };
-    case shopActionTypes.SET_LOADING_COST:
+
       return { ...state, isLoadingCost: action.payload };
     default:
       return state;
@@ -137,59 +114,28 @@ const ShopContextProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    fetchData(
-      `${backendUrl}/api/product/list`,
-      shopActionTypes.SET_PRODUCTS,
-      "Gagal mengambil data produk."
-    );
+    const fetchInitialData = async () => {
+      await Promise.all([
+        fetchData(
+          `${backendUrl}/api/category/list`,
+          shopActionTypes.SET_CATEGORIES,
+          "Gagal mengambil data kategori."
+        ),
+        fetchData(
+          `${backendUrl}/api/subcategory/list`,
+          shopActionTypes.SET_SUBCATEGORIES,
+          "Gagal mengambil data subkategori."
+        ),
+        fetchData(
+          `${backendUrl}/api/product/list`,
+          shopActionTypes.SET_PRODUCTS,
+          "Gagal mengambil data produk."
+        ),
+      ]);
+    };
+    fetchInitialData();
   }, [backendUrl, fetchData]);
 
-  useEffect(() => {
-    const fetchProvinces = async () => {
-      dispatch({ type: shopActionTypes.SET_LOADING, payload: true });
-      try {
-        const response = await axios.get(
-          `${backendUrl}/api/rajaongkir/provinces`
-        );
-        dispatch({
-          type: shopActionTypes.SET_PROVINCES,
-          payload: response.data.provinces,
-        });
-      } catch (error) {
-        toast.error("Gagal mengambil data provinsi.");
-      } finally {
-        dispatch({ type: shopActionTypes.SET_LOADING, payload: false });
-      }
-    };
-    fetchProvinces();
-  }, [backendUrl]);
-
-  const fetchCities = useCallback(
-    async (provinceId) => {
-      dispatch({ type: shopActionTypes.SET_LOADING, payload: true });
-      try {
-        const response = await axios.get(
-          `${backendUrl}/api/rajaongkir/cities/${provinceId}`
-        );
-        console.log("Cities response data:", response.data.cities); // Check the response here
-        dispatch({
-          type: shopActionTypes.SET_CITIES,
-          payload: response.data.cities,
-        });
-      } catch (error) {
-        toast.error("Gagal mengambil data kota.");
-      } finally {
-        dispatch({ type: shopActionTypes.SET_LOADING, payload: false });
-      }
-    },
-    [backendUrl]
-  );
-
-  useEffect(() => {
-    if (state.selectedProvince) {
-      fetchCities(state.selectedProvince);
-    }
-  }, [state.selectedProvince, fetchCities]);
   const getUserCart = useCallback(async () => {
     try {
       const response = await apiCall(
@@ -341,19 +287,8 @@ const ShopContextProvider = ({ children }) => {
     if (state.token) getUserCart();
   }, [state.token, getUserCart]);
 
-  // Use usePlaceOrder hook to get cities and other state
-  const {
-    state: orderState,
-    dispatch: orderDispatch,
-    handleProvinceChange,
-    handleCityChange,
-    calculateShippingCost,
-    handleSubmit,
-  } = usePlaceOrder(state.cartItems, backendUrl, state.token);
-
   const value = {
     ...state,
-    ...orderState,
     formatIDR,
     setToken,
     addToCart,
@@ -366,10 +301,6 @@ const ShopContextProvider = ({ children }) => {
     dispatch,
     getCountCart,
     getCartAmount,
-    calculateShippingCost,
-    handleProvinceChange,
-    handleCityChange,
-    handleSubmit,
   };
 
   return <ShopContext.Provider value={value}>{children}</ShopContext.Provider>;
