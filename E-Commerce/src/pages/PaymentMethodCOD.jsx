@@ -1,15 +1,23 @@
 import React from 'react';
-import { Box, Radio, RadioGroup, Stack } from "@chakra-ui/react";
 
 const PaymentMethodCOD = ({ selectedMethod, setSelectedMethod }) => {
   return (
-    <Box>
-      <RadioGroup value={selectedMethod} onChange={setSelectedMethod}>
-        <Stack direction="column">
-          <Radio value="cod">Cash on Delivery (COD)</Radio>
-        </Stack>
-      </RadioGroup>
-    </Box>
+    <div>
+      <div className="space-y-2">
+        <input
+          type="radio"
+          id="cod"
+          name="paymentMethod"
+          value="cod"
+          checked={selectedMethod === "cod"}
+          onChange={() => setSelectedMethod("cod")}
+          className="mr-2"
+        />
+        <label htmlFor="cod" className="text-sm font-semibold">
+          Cash on Delivery (COD)
+        </label>
+      </div>
+    </div>
   );
 };
 

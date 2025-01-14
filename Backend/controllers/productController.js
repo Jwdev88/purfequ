@@ -18,7 +18,7 @@ const addProduct = async (req, res) => {
       sku,
     } = req.body;
 
-    console.log("req.body:", req.body);
+    // console.log("req.body:", req.body);
 
     // Handle image uploads
     const image1 = req.files?.image1?.[0];
@@ -45,13 +45,13 @@ const addProduct = async (req, res) => {
           typeof variants === "string" ? JSON.parse(variants) : variants;
 
         if (!Array.isArray(parsedVariants)) {
-          throw new Error("Variants must be an array");
+          throw new Error("Variants harus berupa array");
         }
 
         const skuSet = new Set();
         parsedVariants.forEach((variant, index) => {
           if (!variant.name || !Array.isArray(variant.options)) {
-            throw new Error(`Invalid variant structure at index ${index}`);
+            throw new Error(`Struktur variant tidak valid di index ${index}`);
           }
 
           variant.options.forEach((option, optIndex) => {
@@ -61,13 +61,13 @@ const addProduct = async (req, res) => {
 
             if (!option.name || isNaN(option.stock) || isNaN(option.price) || isNaN(option.weight)) {
               throw new Error(
-                `Invalid option structure in variant ${index}, option ${optIndex}`
+                `Struktur option tidak valid di variant ${index}, option ${optIndex}`
               );
             }
 
             if (skuSet.has(option.sku)) {
               throw new Error(
-                `Duplicate SKU found in variant ${index}, option ${optIndex}`
+                `SKU duplikat ditemukan di variant ${index}, option ${optIndex}`
               );
             }
             skuSet.add(option.sku);
@@ -76,7 +76,7 @@ const addProduct = async (req, res) => {
       } catch (error) {
         return res.status(400).json({
           success: false,
-          message: `Invalid variants data: ${error.message}`,
+          message: `Data variant tidak valid: ${error.message}`,
         });
       }
     }
@@ -166,10 +166,6 @@ const addProduct = async (req, res) => {
     });
   }
 };
-
-
-
-
 const getProducts = async (req, res) => {
   try {
     const products = await Product.find({})
@@ -178,10 +174,9 @@ const getProducts = async (req, res) => {
 
     res.status(200).json({ success: true, products });
   } catch (error) {
-    console.error("Error retrieving products:", error);
     res
       .status(500)
-      .json({ success: false, message: "Failed to load product data" });
+      .json({ success: false, message: "Gagal memuat data produk" });
   }
 };
 const getProductById = async (req, res) => {
@@ -190,7 +185,7 @@ const getProductById = async (req, res) => {
     if (!Id || !mongoose.Types.ObjectId.isValid(Id)) {
       return res
         .status(400)
-        .json({ success: false, message: "Invalid product ID" });
+        .json({ success: false, message: "ID produk tidak valid" });
     }
 
     const product = await Product.findById(Id)
@@ -200,33 +195,28 @@ const getProductById = async (req, res) => {
     if (!product) {
       return res
         .status(404)
-        .json({ success: false, message: "Product not found" });
+        .json({ success: false, message: "Produk tidak ditemukan" });
     }
 
     res.json({ success: true, product });
   } catch (error) {
     console.error("Error retrieving product:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    res.status(500).json({ success: false, message: "Terjadi kesalahan server" });
   }
 };
-
-
 const deleteProduct = async (req, res) => {
   const { productId } = req.body;
   try {
     // Assuming you have a Product model
     const product = await Product.findByIdAndDelete(productId);
     if (!product) {
-      return res.status(404).json({ success: false, message: "Product not found" });
+      return res.status(404).json({ success: false, message: "Produk tidak ditemukan" });
     }
-    res.json({ success: true, message: "Product deleted successfully" });
+    res.json({ success: true, message: "Produk berhasil dihapus" });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Failed to delete product" });
+    res.status(500).json({ success: false, message: "Gagal menghapus produk" });
   }
 };
-
-
-
 const editProduct = async (req, res) => {
   try {
     const { productId } = req.params;
@@ -246,20 +236,20 @@ const editProduct = async (req, res) => {
     if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
       return res
         .status(400)
-        .json({ success: false, message: "Invalid productId" });
+        .json({ success: false, message: "ID produk tidak valid" });
     }
 
-    // Parse and validate variants
+    // Parse dan validasi variant
     let parsedVariants;
     try {
       parsedVariants =
         typeof variants === "string" ? JSON.parse(variants) : variants;
       if (!Array.isArray(parsedVariants) || parsedVariants.length === 0) {
-        throw new Error("Variants must be a non-empty array");
+        throw new Error("Variants harus berupa array yang tidak kosong");
       }
       parsedVariants.forEach((variant, index) => {
         if (!variant.name || !Array.isArray(variant.options)) {
-          throw new Error(`Invalid variant structure at index ${index}`);
+          throw new Error(`Struktur variant tidak valid pada indeks ${index}`);
         }
         variant.options.forEach((option, optIndex) => {
           option.stock = Number(option.stock);
@@ -267,7 +257,7 @@ const editProduct = async (req, res) => {
           option.weight = Number(option.weight);
           if (!option.name || isNaN(option.stock)) {
             throw new Error(
-              `Invalid option structure in variant ${index}, option ${optIndex}`
+              `Struktur opsi tidak valid pada variant ${index}, opsi ${optIndex}`
             );
           }
         });
@@ -275,7 +265,7 @@ const editProduct = async (req, res) => {
     } catch (error) {
       return res.status(400).json({
         success: false,
-        message: `Invalid variants data: ${error.message}`,
+        message: `Data variant tidak valid: ${error.message}`,
       });
     }
 
@@ -316,17 +306,17 @@ const editProduct = async (req, res) => {
     if (!product) {
       return res
         .status(404)
-        .json({ success: false, message: "Product not found" });
+        .json({ success: false, message: "Produk tidak ditemukan" });
     }
 
     res.json({
       success: true,
-      message: "Product updated successfully",
+      message: "Produk berhasil diperbarui",
       product,
     });
   } catch (error) {
-    console.error("Error updating product:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error("Error memperbarui produk:", error);
+    res.status(500).json({ success: false, message: "Kesalahan server" });
   }
 };
 

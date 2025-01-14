@@ -16,7 +16,7 @@ const reducer = (state, action) => {
 
 const Navbar = () => {
   const [state, dispatch] = useReducer(reducer, initialState);
-  const { setShowSearch, navigate, token, setToken,  getCountCart} = useContext(ShopContext);
+  const { toggleShowSearch, navigate, token, setToken, getCountCart } = useContext(ShopContext);
 
   const logout = () => {
     navigate('/login');
@@ -51,7 +51,7 @@ const Navbar = () => {
       </ul>
 
       <div className="flex items-center gap-6">
-        <img onClick={() => setShowSearch(true)} src={assets.search_icon} className="w-5 cursor-pointer" alt="Search" />
+        <img onClick={() => toggleShowSearch(true)} src={assets.search_icon} className="w-5 cursor-pointer" alt="Search" />
 
         <div className="group relative">
           <img onClick={() => token ? null : navigate('/login')} className="w-5 cursor-pointer" src={assets.profile_icon} alt="Profile" />
@@ -99,5 +99,3 @@ const Navbar = () => {
 };
 
 export default Navbar;
-
-

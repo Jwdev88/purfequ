@@ -2,8 +2,8 @@ import { useReducer, useCallback, useEffect, useMemo } from "react";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { actionTypes } from "../context/actionTypes";
-import { apiCall } from "../context/ShopContext";
-
+// import { apiCall } from "../context/ShopContext";
+import { apiCall } from "../utils/apiCall";
 const initialState = {
   selectedProvince: "",
   selectedCity: "",
@@ -14,6 +14,7 @@ const initialState = {
     lastName: "",
     email: "",
     phone: "",
+    address: "",
   },
   selectedService: null,
   method: "cod",
@@ -58,7 +59,10 @@ const usePlaceOrder = (initialCartItems, backendUrl, token) => {
   const fetchProvinces = useCallback(async () => {
     try {
       const response = await apiCall(`${backendUrl}/api/rajaongkir/provinces`);
-      dispatch({ type: actionTypes.SET_PROVINCES, payload: response.data.provinces });
+      dispatch({
+        type: actionTypes.SET_PROVINCES,
+        payload: response.data.provinces,
+      });
     } catch (error) {
       toast.error("Failed to fetch provinces.");
     }
@@ -68,45 +72,59 @@ const usePlaceOrder = (initialCartItems, backendUrl, token) => {
     fetchProvinces();
   }, [fetchProvinces]);
 
-  const fetchCities = useCallback(async (provinceId) => {
-    if (citiesCache.has(provinceId)) {
-      console.log("Menggunakan data kota dari cache.");
-      dispatch({ type: actionTypes.SET_CITIES, payload: citiesCache.get(provinceId) });
-      return;
-    }
+  const fetchCities = useCallback(
+    async (provinceId) => {
+      if (citiesCache.has(provinceId)) {
+        console.log("Menggunakan data kota dari cache.");
+        dispatch({
+          type: actionTypes.SET_CITIES,
+          payload: citiesCache.get(provinceId),
+        });
+        return;
+      }
 
-    console.log("Fetching cities for province:", provinceId);
-    dispatch({ type: actionTypes.SET_LOADING, payload: true });
-    try {
-      const response = await apiCall(`${backendUrl}/api/rajaongkir/cities/${provinceId}`);
-      console.log("Cities response:", response.data);
+      console.log("Fetching cities for province:", provinceId);
+      dispatch({ type: actionTypes.SET_LOADING, payload: true });
+      try {
+        const response = await apiCall(
+          `${backendUrl}/api/rajaongkir/cities/${provinceId}`
+        );
+        console.log("Cities response:", response.data);
 
-      const cities = response.data || [];
-      console.log("Processed cities:", cities);
-      
-      citiesCache.set(provinceId, cities);
-      dispatch({ type: actionTypes.SET_CITIES, payload: cities });
-    } catch (error) {
-      toast.error("Failed to fetch cities.");
-      dispatch({ type: actionTypes.SET_CITIES, payload: [] });
-    } finally {
-      dispatch({ type: actionTypes.SET_LOADING, payload: false });
-    }
-  }, [backendUrl, citiesCache]);
+        const cities = response.data || [];
+        console.log("Processed cities:", cities);
 
-  const handleProvinceChange = useCallback((provinceId) => {
-    dispatch({ type: actionTypes.SET_SELECTED_PROVINCE, payload: provinceId });
-    dispatch({
-      type: actionTypes.SET_FORM_DATA,
-      payload: { selectedProvince: provinceId },
-    });
-    fetchCities(provinceId);
-    dispatch({ type: actionTypes.SET_SELECTED_CITY, payload: "" });
-    dispatch({
-      type: actionTypes.SET_FORM_DATA,
-      payload: { selectedCity: "" },
-    });
-  }, [fetchCities]);
+        citiesCache.set(provinceId, cities);
+        dispatch({ type: actionTypes.SET_CITIES, payload: cities });
+      } catch (error) {
+        toast.error("Failed to fetch cities.");
+        dispatch({ type: actionTypes.SET_CITIES, payload: [] });
+      } finally {
+        dispatch({ type: actionTypes.SET_LOADING, payload: false });
+      }
+    },
+    [backendUrl, citiesCache]
+  );
+
+  const handleProvinceChange = useCallback(
+    (provinceId) => {
+      dispatch({
+        type: actionTypes.SET_SELECTED_PROVINCE,
+        payload: provinceId,
+      });
+      dispatch({
+        type: actionTypes.SET_FORM_DATA,
+        payload: { selectedProvince: provinceId },
+      });
+      fetchCities(provinceId);
+      dispatch({ type: actionTypes.SET_SELECTED_CITY, payload: "" });
+      dispatch({
+        type: actionTypes.SET_FORM_DATA,
+        payload: { selectedCity: "" },
+      });
+    },
+    [fetchCities]
+  );
 
   const handleCityChange = (cityId) => {
     dispatch({ type: actionTypes.SET_SELECTED_CITY, payload: cityId });
@@ -143,9 +161,26 @@ const usePlaceOrder = (initialCartItems, backendUrl, token) => {
       calculateShippingCost();
     }
   }, [state.selectedCity, calculateShippingCost]);
-
   const handleSubmit = async (orderItems, formData) => {
     try {
+      if (!formData || !formData.address) {
+        console.error("Address data is missing");
+        toast.error("Please provide a valid address");
+        return;
+      }
+
+      if (!orderItems || orderItems.length === 0) {
+        console.error("Order items are missing");
+        toast.error("Your cart is empty");
+        return;
+      }
+
+      if (!state.selectedService) {
+        console.error("Shipping service is not selected");
+        toast.error("Please select a shipping service");
+        return;
+      }
+
       const orderData = {
         address: formData,
         items: orderItems,
@@ -155,54 +190,38 @@ const usePlaceOrder = (initialCartItems, backendUrl, token) => {
         shippingService: state.selectedService,
       };
 
-      let response;
-      switch (state.method) {
-        case "cod":
-          response = await apiCall(
-            `${backendUrl}/api/order/place`,
-            "POST",
-            orderData,
-            token
-          );
-          if (response.data.success) {
-            navigate("/orders");
-            toast.success("Order placed successfully!");
-          } else {
-            toast.error(response.data.message);
-          }
-          break;
+      console.log("Payload to backend:", orderData);
 
-        case "midtrans":
-          response = await apiCall(
-            `${backendUrl}/api/order/midtrans`,
-            "POST",
-            orderData,
-            token
-          );
-          if (response.data.success) {
-            window.snap.pay(response.data.token, {
-              onSuccess: () => {
-                navigate("/orders");
-                toast.success("Order placed successfully!");
-              },
-              onPending: (result) => console.log("Pending:", result),
-              onError: (result) => {
-                console.error("Error:", result);
-                toast.error("Payment failed");
-              },
-              onClose: () => console.log("Closed"),
-            });
-          } else {
-            toast.error(response.data.message);
-          }
-          break;
+      const response = await apiCall(
+        `${backendUrl}/api/order/midtrans`,
+        "POST",
+        orderData,
+        token
+      );
 
-        default:
-          break;
+      if (!response || !response.data || !response.data.success) {
+        console.error("Invalid response from backend:", response);
+        toast.error("Failed to process your order. Please try again.");
+        return;
       }
+
+      console.log("Midtrans Response:", response.data);
+
+      window.snap.pay(response.data.token, {
+        onSuccess: () => {
+          navigate("/orders");
+          toast.success("Order placed successfully!");
+        },
+        onPending: (result) => console.log("Pending:", result),
+        onError: (result) => {
+          console.error("Error:", result);
+          toast.error("Payment failed");
+        },
+        onClose: () => console.log("Closed"),
+      });
     } catch (error) {
       console.error("Error placing order:", error);
-      toast.error("Failed to place order");
+      toast.error("Failed to place your order. Please try again.");
     }
   };
 

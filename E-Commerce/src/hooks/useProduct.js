@@ -1,5 +1,6 @@
-import { useReducer, useEffect, useCallback } from "react";
+import { useReducer, useEffect, useCallback, useContext } from "react";
 import { toast } from "react-toastify";
+import { ShopContext } from "../context/ShopContext";
 
 const initialState = {
   productData: null,
@@ -40,7 +41,8 @@ const reducer = (state, action) => {
   }
 };
 
-export const useProduct = (products, productId, addToCart, formatIDR) => {
+export const useProduct = (productId) => {
+  const { products, addToCart } = useContext(ShopContext);
   const [state, dispatch] = useReducer(reducer, initialState);
 
   // Fetch product data
@@ -51,12 +53,18 @@ export const useProduct = (products, productId, addToCart, formatIDR) => {
     if (product) {
       dispatch({ type: actionTypes.SET_PRODUCT_DATA, payload: product });
     } else {
+      toast.error("Produk tidak ditemukan.");
       dispatch({ type: actionTypes.SET_LOADING, payload: false });
     }
   }, [productId, products]);
 
   // Handle variant change
   const handleVariantChange = useCallback((variantName, option, variantId) => {
+    if (!option || option.stock <= 0) {
+      toast.error("Varian tidak tersedia.");
+      return;
+    }
+
     dispatch({
       type: actionTypes.SET_SELECTED_VARIANT,
       payload: {
@@ -74,46 +82,34 @@ export const useProduct = (products, productId, addToCart, formatIDR) => {
     }
   }, []);
 
-  // Validate variant selection
-  const validateVariantSelection = () => {
-    const hasVariants = state.productData.variants && state.productData.variants.length > 0;
-    const isVariantSelected = state.selectedVariant && state.selectedVariant.optionId;
-
-    if (hasVariants && !isVariantSelected) {
-      toast.error("Harap pilih opsi varian.");
-      return false;
-    }
-    return true;
-  };
-
   // Handle adding product to cart
-  const handleAddToCart = async () => {
-    if (!state.productData) return;
-
-    const hasVariants = state.productData.variants && state.productData.variants.length > 0;
-
-    if (hasVariants && !validateVariantSelection()) return;
-
-    const { _id: productId } = state.productData;
-    const { variantId, optionId } = state.selectedVariant || {};
-
-    if (hasVariants && (!variantId || !optionId)) {
-      toast.error("variantId dan optionId diperlukan untuk produk dengan varian.");
+  const handleAddToCart = useCallback(async () => {
+    if (!state.productData) {
+      toast.error("Produk tidak valid.");
       return;
     }
 
-    // console.log("Adding to cart with selected variant:", { variantId, optionId }); // Debugging log
+    const hasVariants =
+      state.productData.variants && state.productData.variants.length > 0;
+
+    if (
+      hasVariants &&
+      (!state.selectedVariant || !state.selectedVariant.optionId)
+    ) {
+      toast.error("Harap pilih varian sebelum menambahkan ke keranjang.");
+      return;
+    }
 
     try {
       dispatch({ type: actionTypes.SET_ADDING_TO_CART, payload: true });
+      const { _id: productId } = state.productData;
+      const { variantId, optionId } = state.selectedVariant || {};
       await addToCart(productId, variantId, optionId, 1);
-      toast.success("Produk berhasil ditambahkan ke keranjang!");
     } catch (error) {
-      toast.error(error.message || "Gagal menambahkan produk ke keranjang.");
     } finally {
       dispatch({ type: actionTypes.SET_ADDING_TO_CART, payload: false });
     }
-  };
+  }, [state.productData, state.selectedVariant, addToCart]);
 
   return {
     state,

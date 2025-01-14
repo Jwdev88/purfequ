@@ -3,11 +3,11 @@ import { toast } from "react-toastify";
 
 const actionTypes = {
   SET_CART_DATA: "SET_CART_DATA",
+  ADD_TO_CART: "ADD_TO_CART",
   UPDATE_QUANTITY: "UPDATE_QUANTITY",
   REMOVE_ITEM: "REMOVE_ITEM",
   CLEAR_CART: "CLEAR_CART",
 };
-
 const formatCartItemData = (item) => {
   if (!item || !item.productId) {
     // console.error('Item is invalid or does not have productId:', item); // Log untuk debugging
@@ -33,11 +33,12 @@ const formatCartItemData = (item) => {
   };
 };
 
-
 const cartReducer = (state, action) => {
   switch (action.type) {
     case actionTypes.SET_CART_DATA:
       return action.payload.filter(item => item !== null); // Abaikan item yang tidak valid
+    case actionTypes.ADD_TO_CART:
+      return [...state, action.payload];
     case actionTypes.UPDATE_QUANTITY:
       return state.map((item) =>
         item.productId === action.payload.productId &&
@@ -58,7 +59,6 @@ const cartReducer = (state, action) => {
       return state;
   }
 };
-
 export const useCart = (cartItems, updateQuantity, removeItemFromCart, clearCart) => {
   const [cartData, dispatch] = useReducer(cartReducer, []);
   

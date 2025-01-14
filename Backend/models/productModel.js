@@ -14,7 +14,7 @@ const variantOptionSchema = new mongoose.Schema({
   price: { type: Number, required: true },   // Price for this option
   stock: { type: Number, required: true, min: 0 },  // Stock for this option
   weight: { type: Number, required: true, min: 0 }, // Weight for this option
-  optionId: { type: mongoose.Schema.Types.ObjectId, ref: "VariantOption", required: true }, // Option ID ref
+  optionId: { type: mongoose.Schema.Types.ObjectId, ref: "VariantOption" }, // Option ID ref
 });
 
 const VariantOption = mongoose.models.VariantOption || mongoose.model("VariantOption", variantOptionSchema);

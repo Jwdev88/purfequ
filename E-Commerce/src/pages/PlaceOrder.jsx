@@ -1,21 +1,7 @@
 import React, { useContext, useEffect, useState } from "react";
-import {
-  Box,
-  Button,
-  FormControl,
-  FormLabel,
-  Input,
-  Select,
-  VStack,
-  HStack,
-  Radio,
-  RadioGroup,
-  Spinner,
-  Text,
-} from "@chakra-ui/react";
+import { ShopContext } from "../context/ShopContext";
 import Title from "../components/Title";
 import CartTotal from "../components/CartTotal";
-import { ShopContext } from "../context/ShopContext";
 import usePlaceOrder from "../hooks/usePlaceOrder";
 import { actionTypes } from "../context/actionTypes";
 import PaymentMethodCOD from "./PaymentMethodCOD";
@@ -27,19 +13,20 @@ const PlaceOrderForm = ({
   handleProvinceChange,
   handleCityChange,
   provinces,
-  cities = [], // Ensure cities is always an array
+  cities = [], 
   isLoadingCost,
   cost,
   selectedService,
   formatIDR,
 }) => (
-  <VStack spacing={4} flex={1}>
+  <div className="space-y-4 flex-1">
     <Title text1="DELIVERY" text2="INFORMATION" />
 
-    <HStack spacing={4} w="full">
-      <FormControl isRequired>
-        <FormLabel>First Name</FormLabel>
-        <Input
+    <div className="space-x-4 flex w-full">
+      <div className="w-full">
+        <label className="block font-semibold">First Name</label>
+        <input
+          type="text"
           name="firstName"
           value={formData.firstName || ""}
           onChange={(e) =>
@@ -48,11 +35,13 @@ const PlaceOrderForm = ({
               payload: { firstName: e.target.value },
             })
           }
+          className="w-full p-2 border border-gray-300 rounded"
         />
-      </FormControl>
-      <FormControl isRequired>
-        <FormLabel>Last Name</FormLabel>
-        <Input
+      </div>
+      <div className="w-full">
+        <label className="block font-semibold">Last Name</label>
+        <input
+          type="text"
           name="lastName"
           value={formData.lastName || ""}
           onChange={(e) =>
@@ -61,12 +50,14 @@ const PlaceOrderForm = ({
               payload: { lastName: e.target.value },
             })
           }
+          className="w-full p-2 border border-gray-300 rounded"
         />
-      </FormControl>
-    </HStack>
-    <FormControl isRequired>
-      <FormLabel>Email</FormLabel>
-      <Input
+      </div>
+    </div>
+
+    <div>
+      <label className="block font-semibold">Email</label>
+      <input
         type="email"
         name="email"
         value={formData.email || ""}
@@ -76,12 +67,13 @@ const PlaceOrderForm = ({
             payload: { email: e.target.value },
           })
         }
+        className="w-full p-2 border border-gray-300 rounded"
       />
-    </FormControl>
+    </div>
 
-    <FormControl isRequired>
-      <FormLabel>Phone</FormLabel>
-      <Input
+    <div>
+      <label className="block font-semibold">Phone</label>
+      <input
         type="tel"
         name="phone"
         value={formData.phone || ""}
@@ -91,14 +83,32 @@ const PlaceOrderForm = ({
             payload: { phone: e.target.value },
           })
         }
+        className="w-full p-2 border border-gray-300 rounded"
       />
-    </FormControl>
+    </div>
 
-    <FormControl isRequired>
-      <FormLabel>Province</FormLabel>
-      <Select
-        value={formData.selectedProvince || ""} // Bind province value to state
+    <div>
+      <label className="block font-semibold">Address</label>
+      <textarea
+        name="address"
+        value={formData.address || ""}
+        onChange={(e) =>
+          dispatch({
+            type: actionTypes.SET_FORM_DATA,
+            payload: { address: e.target.value },
+          })
+        }
+        className="w-full p-2 border border-gray-300 rounded"
+        rows={3}
+      />
+    </div>
+
+    <div>
+      <label className="block font-semibold">Province</label>
+      <select
+        value={formData.selectedProvince || ""}
         onChange={(e) => handleProvinceChange(e.target.value)}
+        className="w-full p-2 border border-gray-300 rounded"
       >
         <option value="">Select Province</option>
         {provinces.map((province) => (
@@ -106,15 +116,16 @@ const PlaceOrderForm = ({
             {province.province}
           </option>
         ))}
-      </Select>
-    </FormControl>
+      </select>
+    </div>
 
-    <FormControl isRequired>
-      <FormLabel>City</FormLabel>
-      <Select
-        value={formData.selectedCity || ""} // Bind city value to state
+    <div>
+      <label className="block font-semibold">City</label>
+      <select
+        value={formData.selectedCity || ""}
         onChange={(e) => handleCityChange(e.target.value)}
-        disabled={cities.length === 0} // Disable city select if no cities
+        disabled={cities.length === 0}
+        className="w-full p-2 border border-gray-300 rounded"
       >
         <option value="">Select City</option>
         {cities.map((city) => (
@@ -122,34 +133,42 @@ const PlaceOrderForm = ({
             {city.city_name}
           </option>
         ))}
-      </Select>
-    </FormControl>
+      </select>
+    </div>
 
     {isLoadingCost ? (
-      <Spinner />
+      <div className="flex justify-center items-center p-4">
+        <div className="spinner-border animate-spin" />
+      </div>
     ) : (
       cost && (
-        <Box>
-          <Text>Select Shipping Service:</Text>
-          <RadioGroup
-            onChange={(value) =>
-              dispatch({
-                type: actionTypes.SET_SELECTED_SERVICE,
-                payload: cost.find((service) => service.service === value),
-              })
-            }
-            value={selectedService?.service || ""}
-          >
+        <div className="space-y-4">
+          <p>Select Shipping Service:</p>
+          <div>
             {cost.map((service) => (
-              <Radio key={service.service} value={service.service}>
-                {service.service} - {formatIDR(service.cost[0].value)}
-              </Radio>
+              <div key={service.service} className="flex items-center space-x-4">
+                <input
+                  type="radio"
+                  value={service.service}
+                  checked={selectedService?.service === service.service}
+                  onChange={() =>
+                    dispatch({
+                      type: actionTypes.SET_SELECTED_SERVICE,
+                      payload: service,
+                    })
+                  }
+                  className="mr-2"
+                />
+                <label className="font-semibold">
+                  {service.service} - {formatIDR(service.cost[0].value)}
+                </label>
+              </div>
             ))}
-          </RadioGroup>
-        </Box>
+          </div>
+        </div>
       )
     )}
-  </VStack>
+  </div>
 );
 
 const PlaceOrder = () => {
@@ -159,6 +178,7 @@ const PlaceOrder = () => {
     token,
     formatIDR,
     state: shopState,
+    getCartAmount
   } = useContext(ShopContext);
   const [selectedMethod, setSelectedMethod] = useState("cod");
 
@@ -172,11 +192,10 @@ const PlaceOrder = () => {
 
   if (!state) {
     console.log("State tidak terdefinisi");
-    return <Spinner />;
+    return <div className="flex justify-center items-center">Loading...</div>;
   }
 
-  const { formData, cities, isLoadingCost, cost, selectedService, provinces } =
-    state;
+  const { formData, cities, isLoadingCost, cost, selectedService, provinces } = state;
 
   const onSubmitHandler = async (event) => {
     event.preventDefault();
@@ -185,13 +204,12 @@ const PlaceOrder = () => {
       variantId: item.variantId,
       optionId: item.optionId,
       quantity: item.quantity,
-      totalPrice:
-        item.variant?.selectedOption?.optionPrice ?? item.productPrice ?? 0,
+      totalPrice:totalCart+shippingCost
     }));
 
-    const userId = shopState.userId; // Pastikan userId diambil dari ShopContext
+    
 
-    handleSubmit(orderItems, { ...formData, userId });
+    handleSubmit(orderItems, { ...formData, token });
   };
 
   useEffect(() => {
@@ -200,15 +218,15 @@ const PlaceOrder = () => {
     }
   }, [formData.selectedProvince, handleProvinceChange, cities.length]);
 
+  // Menghitung total harga pesanan
+  const totalCart = getCartAmount();
+
+  const shippingCost = selectedService?.cost[0]?.value || 0;
+  const totalOrder = totalCart + shippingCost;
+
   return (
-    <Box
-      as="form"
-      onSubmit={onSubmitHandler}
-      p={4}
-      borderWidth={1}
-      rounded="md"
-    >
-      <HStack spacing={8} align="start">
+    <form onSubmit={onSubmitHandler} className="p-4 border border-gray-300 rounded-md">
+      <div className="flex space-x-8">
         <PlaceOrderForm
           formData={formData}
           dispatch={dispatch}
@@ -221,9 +239,15 @@ const PlaceOrder = () => {
           selectedService={selectedService}
           formatIDR={formatIDR}
         />
-        <Box flex={1}>
+        <div className="flex-1 space-y-4">
           <CartTotal />
-          <Text>Choose Payment Method : </Text>
+          <div className="p-4 bg-gray-100 border rounded">
+            <p className="font-semibold">Shipping Cost: {formatIDR(shippingCost)}</p>
+            <p className="font-semibold text-lg">
+              Total Order: {formatIDR(totalOrder)}
+            </p>
+          </div>
+          <p>Choose Payment Method:</p>
           <PaymentMethodCOD
             selectedMethod={selectedMethod}
             setSelectedMethod={setSelectedMethod}
@@ -232,12 +256,15 @@ const PlaceOrder = () => {
             selectedMethod={selectedMethod}
             setSelectedMethod={setSelectedMethod}
           />
-          <Button type="submit" colorScheme="teal" w="full" mt={4}>
+          <button
+            type="submit"
+            className="w-full mt-4 bg-teal-500 text-white py-2 rounded"
+          >
             Place Order
-          </Button>
-        </Box>
-      </HStack>
-    </Box>
+          </button>
+        </div>
+      </div>
+    </form>
   );
 };
 

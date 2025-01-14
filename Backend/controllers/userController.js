@@ -14,7 +14,7 @@ const loginUser = async (req, res) => {
     const {email, password } = req.body;
     const user = await userModel.findOne({ email });
     if (!user) {
-        return res.json({ success: false, message: "Invalid credentials : Email not  exists" });
+        return res.json({ success: false, message: "Email tidak ditemukan" });
         
       }
 
@@ -30,7 +30,7 @@ const loginUser = async (req, res) => {
         res.json({success:true,token})
     }
     else{
-        return res.json({ success: false, message: "invalid email or password" });
+        return res.json({ success: false, message: "email atau password salah" });
     }
 
   } catch (error) {
@@ -48,19 +48,19 @@ const registerUser = async (req, res) => {
     const exists = await userModel.findOne({ email });
 
     if (exists) {
-      return res.json({ success: false, message: "Email already exists" });
+      return res.json({ success: false, message: "Email sudah digunakan" });
     }
     //validasi email dan strong password
     if (!validator.isEmail(email)) {
       return res.json({
         success: false,
-        message: "Please enter a valid email",
+        message: "Email tidak valid",
       });
     }
     if (password.length < 8) {
       return res.json({
         success: false,
-        message: "Password must be at least 8 characters long",
+        message: "Password minimal 8 karakter",
       });
     }
 
@@ -76,7 +76,11 @@ const registerUser = async (req, res) => {
 
     const user = await newUser.save();
 
-    const token = createToken(user._id);
+    const token = jwt.sign(
+      { userId: user._id }, // Payload
+      process.env.JWT_SECRET, // Secret key
+      { expiresIn: "1d" } // Masa berlaku token
+    );
 
     res.json({ success: true, token });
   } catch (error) {
@@ -94,7 +98,7 @@ const adminLogin = async (req, res) => {
       res.json({success:true,token})
     }
     else{
-      res.json({success:false,message:"Invalid credentials"})
+      res.json({success:false,message:"Kredensial salah"})
     }
   } catch (error) {
     console.log(error);
@@ -104,3 +108,4 @@ const adminLogin = async (req, res) => {
 }
 
 export { loginUser, registerUser, adminLogin };
+

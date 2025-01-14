@@ -1,118 +1,92 @@
 import React, { useContext, useReducer, useEffect } from "react";
-import {
-  Box,
-  Image,
-  Text,
-  HStack,
-  LinkBox,
-  LinkOverlay,
-  useColorModeValue,
-} from "@chakra-ui/react";
 import { ShopContext } from "../context/ShopContext";
 import { Link as RouterLink } from "react-router-dom";
 import { Sparkles } from "lucide-react";
 
-// Initial state for the product
 const initialState = {
   product: null,
-  catagory: null,
-  subCatagory: null,
   variantPrices: [],
 };
 
-// Reducer function to manage product state
 const reducer = (state, action) => {
   switch (action.type) {
     case "SET_PRODUCT":
       return {
         ...state,
         product: action.payload,
-        catagory: action.payload.catagory,
-        subCatagory: action.payload.subCatagory,
         variantPrices: action.payload?.variants?.flatMap((variant) =>
-          variant.options.map((option) => option.price)
-        ) || [],
+        variant.options.map((option) => option.price)
+      ) || [],
       };
     default:
       return state;
   }
 };
 
-const ProductItem = ({ id }) => {
+const ProductItem = ({ id, name, price, optionPrices }) => {
   const { formatIDR, products } = useContext(ShopContext);
-  const [state, dispatch] = useReducer(reducer, initialState);
+  const [state, dispatchLocal] = useReducer(reducer, initialState);
+  const { product, variantPrices } = state;
 
-  // Fetch product data and update state
+  // Determine price
+  const formattedPrice = price ? `IDR ${price.toLocaleString()}` : 'Not Available';
+  
+  // If variant prices exist, show the lowest price
+  const formattedOptionPrices = variantPrices.length > 0
+    ? `IDR ${Math.min(...variantPrices).toLocaleString()}`
+    : formattedPrice;
+
   useEffect(() => {
     const fetchedProduct = products.find((item) => item._id === id);
-    dispatch({ type: "SET_PRODUCT", payload: fetchedProduct });
-    console.log(fetchedProduct);
+    dispatchLocal({ type: "SET_PRODUCT", payload: fetchedProduct });
   }, [products, id]);
-
-  const { product, variantPrices } = state;
 
   if (!product) return null;
 
   return (
-    <LinkBox
-      as="article"
-      rounded="md"
-      overflow="hidden"
-      boxShadow="md"
-      borderWidth="1px"
-      borderColor="gray.200"
-      bg="white"
-      transition="shadow 0.3s"
-      _hover={{ shadow: "lg" }}
-      title={product.name}
-    >
-      <LinkOverlay as={RouterLink} to={`/product/${id}`}>
-        <Box position="relative" height="60">
-          <Image
+    <div className="bg-white shadow-md rounded-lg overflow-hidden border border-gray-200 transition-transform transform hover:scale-105">
+      <RouterLink to={`/product/${id}`} className="block">
+        {/* Image container */}
+        <div className="relative w-full h-60">
+          <img
             src={product.images?.[0] || "default-image-url.jpg"}
             alt={product.name}
-            width="full"
-            height="full"
-            objectFit="cover"
+            className="w-full h-full object-cover"
+            loading="lazy"
           />
-        </Box>
+        </div>
 
-        <Box p={2}>
-          <Text
-            fontWeight="semibold"
-            fontSize="sm"
-            isTruncated
-            color={useColorModeValue("gray.800", "white")}
-            alt={product.name}
-          >
+        {/* Product Info */}
+        <div className="p-4">
+          {/* Product Name */}
+          <div className="text-sm font-medium text-gray-800 truncate" title={product.name}>
             {product.name}
-          </Text>
-          <Text fontWeight="bold" color="gray.800">
-            {variantPrices.length > 0 ? (
+          </div>
+
+          {/* Product Price */}
+          <div className="font-bold text-gray-800 mt-2">
+            {variantPrices.length > 0 ?(
               <>
-                {formatIDR(Math.min(...variantPrices))} -{" "}
-                {formatIDR(Math.max(...variantPrices))}
+                {formatIDR(...variantPrices)}
               </>
             ) : (
-              formatIDR(product.price || 0)
-            )}
-          </Text>
+              formatIDR(product.price||0)
+            )
+          }
+          </div>
 
-          <HStack mt={1} alignItems="center">
+          {/* Product Rating */}
+          <div className="flex mt-2">
             {Array.from({ length: 5 }).map((_, i) => (
               <Sparkles
                 key={i}
-                className={`w-5 h-5 ${
-                  i < Math.floor(product.rating)
-                    ? "text-yellow-400"
-                    : "text-gray-300"
-                }`}
+                className={`w-5 h-5 ${i < Math.floor(product.rating) ? "text-yellow-400" : "text-gray-300"}`}
               />
             ))}
-          </HStack>
-        </Box>
-      </LinkOverlay>
-    </LinkBox>
+          </div>
+        </div>
+      </RouterLink>
+    </div>
   );
 };
 

@@ -45,27 +45,23 @@ const placeOrderMidtrans = async (req, res) => {
   try {
     const { userId, items, amount, address } = req.body;
 
-    // Basic validation (add more as needed)
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing required information",
-      });
-    }
-    // if (items.length === 0) {
-    //   return res.status(400).json({ success: false, message: "Cart is empty" });
-    // }
-    // if (amount <= 0) {
-    //   return res.status(400).json({ success: false, message: "Invalid amount" });
-    // }
+    console.log("Received data:", req.body);
 
-    // // ... (generate transaction token and orderData) ...
+    if (!userId) return res.status(400).json({ message: "Missing userId" });
+    if (!items || !Array.isArray(items) || items.length === 0)
+        return res.status(400).json({ message: "Items are missing or invalid" });
+    if (!amount) return res.status(400).json({ message: "Amount is missing" });
+    if (!address) return res.status(400).json({ message: "Address is missing" });
+    
 
-    // // Execute database operations concurrently (if needed)
-    // await Promise.all([
-    //   newOrder.save(),
-    //   userModel.findByIdAndUpdate(userId, { cartData: [] }),
-    // ]);
+
+    // ... (generate transaction token and orderData) ...
+
+    // Execute database operations concurrently (if needed)
+    await Promise.all([
+      newOrder.save(),
+      userModel.findByIdAndUpdate(userId, { cartData: [] }),
+    ]);
 
     // console.log(`Order placed successfully (orderId: ${order_id}, userId: ${userId})`);
     const order_id = uuidv4(); // Generate a UUID for the order ID
@@ -92,9 +88,7 @@ const placeOrderMidtrans = async (req, res) => {
     const orderData = {
       orderId: order_id, // Use the generated UUID
       userId,
-      // items,
-      // address,
-      // amount,
+
       paymentMethod: "Midtrans",
       payment: false,
       transactionToken: transactionToken.token,

@@ -1,3 +1,5 @@
+//ShopContext.jsx
+
 import React, {
   createContext,
   useEffect,
@@ -8,13 +10,14 @@ import { FormatRupiah } from "@arismun/format-rupiah";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import { actionTypes as shopActionTypes } from "./actionTypes";
-
+import { apiCall } from "../utils/apiCall";
 export const ShopContext = createContext();
 
 const initialState = {
   token: localStorage.getItem("token") || "",
+  search: "",
+  showSearch: false,
   cartItems: [],
   categories: [],
   subCategories: [],
@@ -23,98 +26,103 @@ const initialState = {
 };
 
 const reducer = (state, action) => {
+  // console.log("Reducer action type:", action.type);
+  // console.log("Reducer action payload:", action.payload);
   switch (action.type) {
-    case shopActionTypes.SET_CART_DATA:
-      return { ...state, cartItems: action.payload };
-    case shopActionTypes.UPDATE_QUANTITY:
-      return {
-        ...state,
-        cartItems: state.cartItems.map((item) =>
-          item.productId === action.payload.productId &&
-          item.variantId === action.payload.variantId &&
-          item.optionId === action.payload.optionId
-            ? {
-                ...item,
-                quantity: action.payload.newQuantity,
-                totalPrice: item.optionPrice * action.payload.newQuantity,
-              }
-            : item
-        ),
-      };
-    case shopActionTypes.CLEAR_CART:
-      return { ...state, cartItems: [] };
+    case shopActionTypes.SET_SEARCH:
+      return { ...state, search: action.payload };
+    case shopActionTypes.TOGGLE_SHOW_SEARCH:
+      return { ...state, showSearch: action.payload };
     case shopActionTypes.SET_PRODUCTS:
       return { ...state, products: action.payload || [] };
     case shopActionTypes.SET_CATEGORIES:
-      return { ...state, categories: action.payload }; // Added case for setting categories
+      return { ...state, categories: action.payload };
     case shopActionTypes.SET_SUBCATEGORIES:
-      return { ...state, subCategories: action.payload };
+      return { ...state, subCategories: action.payload || [] };
     case shopActionTypes.SET_CART_ITEMS:
-      return { ...state, cartItems: action.payload };
-
-      return { ...state, cost: action.payload };
+      return { ...state, cartItems: action.payload || [] };
+    case shopActionTypes.SET_LOADING:
+      return { ...state, isLoading: action.payload };   
     case shopActionTypes.SET_TOKEN:
       return { ...state, token: action.payload };
-    case shopActionTypes.SET_LOADING:
-      return { ...state, isLoading: action.payload };
-
-      return { ...state, isLoadingCost: action.payload };
     default:
+      // console.debug("Unhandled action type:", action.type);
       return state;
   }
 };
 
-export const apiCall = async (url, method = "GET", data = {}, token = "") => {
-  const config = {
-    method,
-    url,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: token ? `Bearer ${token}` : undefined,
-    },
-    data,
-  };
-  return axios(config);
-};
+
 
 const ShopContextProvider = ({ children }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
   const navigate = useNavigate();
-
   const formatIDR = useCallback(
     (amount) => (
       <FormatRupiah value={amount} decimalSeparator="," thousandSeparator="." />
     ),
     []
   );
-
   const setToken = useCallback((token) => {
+    localStorage.setItem("token", token);
     dispatch({ type: shopActionTypes.SET_TOKEN, payload: token });
-  }, []);
-
-  const fetchData = useCallback(async (url, actionType, errorMessage) => {
-    dispatch({ type: shopActionTypes.SET_LOADING, payload: true });
-    try {
-      const response = await apiCall(url);
-      if (response.data.success) {
-        const key = actionType.split("_")[1].toLowerCase();
-        dispatch({
-          type: shopActionTypes[actionType],
-          payload: response.data[key],
-        });
-      } else {
-        toast.error(response.data.message || errorMessage);
-      }
-    } catch (error) {
-      toast.error(error.message || errorMessage);
-    } finally {
-      dispatch({ type: shopActionTypes.SET_LOADING, payload: false });
+  }, []); const setSearch = (search) => {
+    dispatch({ type: shopActionTypes.SET_SEARCH, payload: search });
+  };
+  const toggleShowSearch = (visible) => {
+    if (!visible) {
+      dispatch({ type: shopActionTypes.SET_SEARCH, payload: "" }); // Reset search saat SearchBar ditutup
     }
-  }, []);
+    dispatch({ type: shopActionTypes.TOGGLE_SHOW_SEARCH, payload: visible });
+  };
+  const fetchData = useCallback(
+    async (url, actionType, errorMessage) => {
+      console.log("Sedang mengambil data dari URL:", url);
+      console.log("Tipe Aksi:", actionType);
+      dispatch({ type: shopActionTypes.SET_LOADING, payload: true });
+
+      try {
+        const response = await apiCall(url, "GET", {}, state.token);
+        const data = response.data;
+        console.log("Fetched data:", data);
+
+        if (data.success) {
+          // Gunakan mapping key yang sesuai dengan response API
+          const key = {
+            SET_CATEGORIES: "categories",
+            SET_SUBCATEGORIES: "subCategories",
+            SET_PRODUCTS: "products",
+          }[actionType];
+
+          if (key && data[key]) {
+            console.log(
+              `Dispatching action ${actionType} with payload:`,
+              data[key]
+            );
+            dispatch({
+              type: actionType,
+              payload: data[key],
+            });
+          } else {
+            console.error(`Key "${key}" tidak ditemukan dalam response API.`);
+            toast.error(errorMessage);
+          }
+        } else {
+          throw new Error(data.message || errorMessage);
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        toast.error(error.message || errorMessage);
+      } finally {
+        dispatch({ type: shopActionTypes.SET_LOADING, payload: false });
+      }
+    },
+    [state.token]
+  );
 
   useEffect(() => {
     const fetchInitialData = async () => {
+      console.log("Fetching initial data...");
       await Promise.all([
         fetchData(
           `${backendUrl}/api/category/list`,
@@ -132,18 +140,21 @@ const ShopContextProvider = ({ children }) => {
           "Gagal mengambil data produk."
         ),
       ]);
+      console.log("Initial data fetched.");
     };
     fetchInitialData();
   }, [backendUrl, fetchData]);
 
   const getUserCart = useCallback(async () => {
     try {
+      console.log("Fetching user cart...");
       const response = await apiCall(
         `${backendUrl}/api/cart/get`,
         "GET",
         {},
         state.token
       );
+      console.log("User cart response:", response.data);
       if (response.data.success) {
         dispatch({
           type: shopActionTypes.SET_CART_ITEMS,
@@ -153,9 +164,14 @@ const ShopContextProvider = ({ children }) => {
         throw new Error("Gagal mengambil data keranjang.");
       }
     } catch (error) {
+      console.error("Error fetching user cart:", error);
       toast.error(error.message || "Kesalahan saat mengambil data keranjang.");
     }
   }, [backendUrl, state.token]);
+
+  useEffect(() => {
+    if (state.token) getUserCart();
+  }, [state.token, getUserCart]);
 
   const addToCart = useCallback(
     async (productId, variantId, optionId, quantity) => {
@@ -170,8 +186,19 @@ const ShopContextProvider = ({ children }) => {
           { productId, variantId, optionId, quantity },
           state.token
         );
+
+        console.log("API response:", response.data); // Debugging log
+
         if (response.data.success) {
-          await getUserCart();
+          console.log("API cartData:", response.data.cartData); // Debugging log
+
+          dispatch({
+            type: shopActionTypes.SET_CART_ITEMS,
+            payload: response.data.cartData || [], // Ensure payload is always an array
+          });
+
+          toast.success("Produk berhasil ditambahkan ke keranjang.");
+          return response.data.cartData;
         } else {
           throw new Error(
             response.data.message || "Gagal menambahkan item ke keranjang."
@@ -181,9 +208,10 @@ const ShopContextProvider = ({ children }) => {
         toast.error(
           error.message || "Kesalahan saat menambahkan item ke keranjang."
         );
+        throw error;
       }
     },
-    [backendUrl, state.token, getUserCart]
+    [backendUrl, state.token]
   );
 
   const updateQuantity = useCallback(
@@ -282,26 +310,24 @@ const ShopContextProvider = ({ children }) => {
     }, 0);
     return totalAmount;
   }, [state.cartItems]);
-
-  useEffect(() => {
-    if (state.token) getUserCart();
-  }, [state.token, getUserCart]);
-
   const value = {
     ...state,
     formatIDR,
+    setSearch,
+    toggleShowSearch,
     setToken,
     addToCart,
+    getUserCart,
     updateQuantity,
     removeItemFromCart,
     clearCart,
-    getUserCart,
+    getCountCart,
+    getCartAmount,
     navigate,
     backendUrl,
     dispatch,
-    getCountCart,
-    getCartAmount,
   };
+  console.log("Shop Context State:", state);
 
   return <ShopContext.Provider value={value}>{children}</ShopContext.Provider>;
 };
