@@ -7,7 +7,7 @@ const Orders = () => {
   const [orderData, setOrderData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedOrderItem, setSelectedOrderItem] = useState(null);  // Untuk menyimpan item yang diklik
+  const [selectedOrderItem, setSelectedOrderItem] = useState(null); // Untuk menyimpan item yang diklik
 
   const loadOrderData = async () => {
     try {
@@ -39,26 +39,43 @@ const Orders = () => {
   }, [token]);
 
   if (loading) {
-    return <div className="flex justify-center items-center py-8 text-xl">Loading...</div>;
+    return (
+      <div className="flex justify-center items-center py-8 text-xl">
+        Loading...
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="flex justify-center items-center py-8 text-xl text-red-600">{error}</div>;
+    return (
+      <div className="flex justify-center items-center py-8 text-xl text-red-600">
+        {error}
+      </div>
+    );
   }
 
   return (
     <div className="container mx-auto px-4 py-8">
       {orderData && orderData.length > 0 ? (
         orderData.map((order) => (
-          <div key={order._id} className="bg-white shadow-lg rounded-lg p-6 mb-8">
-            <h2 className="text-2xl font-semibold mb-4">Order ID: {order._id}</h2>
+          <div
+            key={order._id}
+            className="bg-white shadow-lg rounded-lg p-6 mb-8"
+          >
+            <h2 className="text-2xl font-semibold mb-4">
+              Order ID: {order._id}
+            </h2>
 
             {/* Order Address */}
             <div className="mb-6">
               <h3 className="text-xl font-semibold">Address</h3>
-              <p>{order.address.firstName} {order.address.lastName}</p>
+              <p>
+                {order.address.firstName} {order.address.lastName}
+              </p>
               <p>{order.address.address}</p>
-              <p>{order.address.city}, {order.address.province}</p>
+              <p>
+                {order.address.city}, {order.address.province}
+              </p>
               <p>Phone: {order.address.phone}</p>
               <p>Email: {order.address.email}</p>
             </div>
@@ -66,9 +83,23 @@ const Orders = () => {
             {/* Order Status and Payment Info */}
             <div className="mb-6">
               <h3 className="text-xl font-semibold">Order Status</h3>
-              <p className="text-gray-700">Status: {order.status}</p>
-              <p className="text-gray-700">Payment Method: {order.paymentMethod}</p>
-              <p className="text-gray-700">Total Amount: {currency} {order.amount}</p>
+              <p className="text-gray-700">
+                Status:{" "}
+                {order.status === "pending" && (
+                  <a
+                    href={`https://app.sandbox.midtrans.com/snap/v2/vtweb/${order.transactionToken}`}
+                    target="_blank"
+                  >
+                    Lanjutkan Pembayaran
+                  </a>
+                )}
+              </p>
+              <p className="text-gray-700">
+                Payment Method: {order.paymentMethod}
+              </p>
+              <p className="text-gray-700">
+                Total Amount: {currency} {order.amount}
+              </p>
             </div>
 
             {/* Order Items */}
@@ -79,13 +110,13 @@ const Orders = () => {
                   <div
                     key={index}
                     className="flex mb-4 p-4 border rounded-lg bg-gray-50 shadow-sm cursor-pointer hover:bg-gray-200"
-                    onClick={() => setSelectedOrderItem(item)}  // Mengatur item yang dipilih
+                    onClick={() => setSelectedOrderItem(item)} // Mengatur item yang dipilih
                   >
                     {/* Menampilkan hanya satu gambar */}
                     <div className="flex-shrink-0">
                       {item.productImages && item.productImages.length > 0 && (
                         <img
-                          src={item.productImages[0]}  // Menampilkan gambar pertama
+                          src={item.productImages[0]} // Menampilkan gambar pertama
                           alt={item.productName}
                           className="w-24 h-24 object-cover rounded-md"
                         />
@@ -94,13 +125,21 @@ const Orders = () => {
 
                     {/* Informasi item */}
                     <div className="ml-4 flex-1">
-                      <h4 className="font-semibold text-lg">{item.productName}</h4>
+                      <h4 className="font-semibold text-lg">
+                        {item.productName}
+                      </h4>
                       <p className="text-gray-700">Quantity: {item.quantity}</p>
-                      <p className="text-gray-700">Price: {currency} {item.price}</p>
+                      <p className="text-gray-700">
+                        Price: {currency} {item.price}
+                      </p>
                       {item.variant && item.variant.selectedOption && (
                         <>
-                          <p className="text-gray-700">Variant: {item.variant.variantName}</p>
-                          <p className="text-gray-700">Option: {item.variant.selectedOption.optionName}</p>
+                          <p className="text-gray-700">
+                            Variant: {item.variant.variantName}
+                          </p>
+                          <p className="text-gray-700">
+                            Option: {item.variant.selectedOption.optionName}
+                          </p>
                         </>
                       )}
                     </div>
@@ -115,20 +154,33 @@ const Orders = () => {
                 <h4 className="text-xl font-semibold">Selected Item Details</h4>
                 <div className="flex">
                   <img
-                    src={selectedOrderItem.productImages[0]}  // Menampilkan gambar pertama
+                    src={selectedOrderItem.productImages[0]} // Menampilkan gambar pertama
                     alt={selectedOrderItem.productName}
                     className="w-32 h-32 object-cover rounded-md"
                   />
                   <div className="ml-4">
-                    <h5 className="text-lg font-semibold">{selectedOrderItem.productName}</h5>
+                    <h5 className="text-lg font-semibold">
+                      {selectedOrderItem.productName}
+                    </h5>
                     <p>Quantity: {selectedOrderItem.quantity}</p>
-                    <p>Price: {currency} {selectedOrderItem.price}</p>
-                    {selectedOrderItem.variant && selectedOrderItem.variant.selectedOption && (
-                      <>
-                        <p>Variant: {selectedOrderItem.variant.variantName}</p>
-                        <p>Option: {selectedOrderItem.variant.selectedOption.optionName}</p>
-                      </>
-                    )}
+                    <p>
+                      Price: {currency} {selectedOrderItem.price}
+                    </p>
+                    {selectedOrderItem.variant &&
+                      selectedOrderItem.variant.selectedOption && (
+                        <>
+                          <p>
+                            Variant: {selectedOrderItem.variant.variantName}
+                          </p>
+                          <p>
+                            Option:{" "}
+                            {
+                              selectedOrderItem.variant.selectedOption
+                                .optionName
+                            }
+                          </p>
+                        </>
+                      )}
                   </div>
                 </div>
               </div>
