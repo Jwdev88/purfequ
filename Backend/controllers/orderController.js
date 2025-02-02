@@ -191,29 +191,45 @@ const updateStatus = async (req, res) => {
 const handleNotification = async (req, res) => {
   try {
     const notification = req.body;
+
+    // Validasi data yang diterima dari Midtrans
+    if (!notification.order_id || !notification.transaction_status || !notification.fraud_status) {
+      return res.status(400).send("Invalid notification data");
+    }
+
     const orderId = notification.order_id;
     const transactionStatus = notification.transaction_status;
     const fraudStatus = notification.fraud_status;
 
-    let newStatus = "pending";
+    // Tentukan status pembayaran berdasarkan transaction_status
+    let newStatus = "pending";  // Default status adalah pending
     if (transactionStatus === "settlement") {
-      newStatus = "paid";  // Pembayaran sukses
+      newStatus = "paid";  // Pembayaran berhasil
     } else if (transactionStatus === "cancel" || transactionStatus === "expire" || transactionStatus === "deny") {
       newStatus = "failed"; // Pembayaran gagal
     }
 
     // Update status order di MongoDB
-    await orderModel.findOneAndUpdate(
-      { transactionToken: orderId },
-      { payment: newStatus === "paid", status: newStatus }
+    const updatedOrder = await orderModel.findOneAndUpdate(
+      { transactionToken: orderId },  // Sesuaikan dengan field yang ada di database
+      { payment: newStatus === "paid", status: newStatus },  // Update status pembayaran
+      { new: true } // Mendapatkan data yang telah diupdate
     );
 
+    // Jika order tidak ditemukan, berikan response 404
+    if (!updatedOrder) {
+      return res.status(404).send("Order not found");
+    }
+
+    // Kirimkan response sukses
     res.status(200).send("OK");
+
   } catch (error) {
     console.error("Error handling notification:", error);
-    res.status(500).send(error);
+    res.status(500).send("Internal Server Error");
   }
 };
+
 
 
 

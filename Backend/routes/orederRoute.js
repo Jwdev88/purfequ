@@ -26,5 +26,10 @@ orderRouter.post('/midtrans-success', handleSuccess);
 orderRouter.post('/midtrans-failure', handleFailure);
 //user featrues
 orderRouter.post("/userorders", authUser, userOrders);
-
+// Log semua route yang terdaftar
+orderRouter.stack.forEach((route) => {
+  if (route.route) {
+    console.log(`Method: ${route.route.stack[0].method.toUpperCase()}, Path: ${route.route.path}`);
+  }
+});
 export default orderRouter;
