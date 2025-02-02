@@ -1,22 +1,16 @@
-import React from 'react';
+import React from "react";
 
 const PaymentMethodCOD = ({ selectedMethod, setSelectedMethod }) => {
   return (
-    <div>
-      <div className="space-y-2">
-        <input
-          type="radio"
-          id="cod"
-          name="paymentMethod"
-          value="cod"
-          checked={selectedMethod === "cod"}
-          onChange={() => setSelectedMethod("cod")}
-          className="mr-2"
-        />
-        <label htmlFor="cod" className="text-sm font-semibold">
-          Cash on Delivery (COD)
-        </label>
-      </div>
+    <div className="mt-4">
+      <button
+        onClick={() => setSelectedMethod("cod")}
+        className={`w-full py-2 bg-teal-500 text-white font-semibold rounded-md hover:bg-teal-600 transition duration-300 ${
+          selectedMethod === "cod"? "bg-teal-600": ""
+        }`}
+      >
+        Cash on Delivery (COD)
+      </button>
     </div>
   );
 };

@@ -9,7 +9,7 @@ export const apiCall = async (url, method = "GET", data = {}, token = "") => {
         "Content-Type": "application/json",
         Authorization: token ? `Bearer ${token}` : undefined,
       },
-      data,
+      data:data
     };
     const response = await axios(config);
     return response;

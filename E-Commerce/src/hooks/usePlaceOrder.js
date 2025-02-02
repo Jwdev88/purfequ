@@ -2,8 +2,8 @@ import { useReducer, useCallback, useEffect, useMemo } from "react";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { actionTypes } from "../context/actionTypes";
-// import { apiCall } from "../context/ShopContext";
 import { apiCall } from "../utils/apiCall";
+
 const initialState = {
   selectedProvince: "",
   selectedCity: "",
@@ -25,16 +25,21 @@ const initialState = {
 
 const reducer = (state, action) => {
   switch (action.type) {
+    case actionTypes.SET_FORM_DATA:
+      return { ...state, formData: { ...state.formData, ...action.payload } };
     case actionTypes.SET_SELECTED_PROVINCE:
-      return { ...state, selectedProvince: action.payload };
+      return {
+        ...state,
+        selectedProvince: action.payload,
+        selectedCity: "",
+        cities: [],
+      };
     case actionTypes.SET_SELECTED_CITY:
       return { ...state, selectedCity: action.payload };
     case actionTypes.SET_COST:
       return { ...state, cost: action.payload };
     case actionTypes.SET_LOADING:
       return { ...state, isLoading: action.payload };
-    case actionTypes.SET_FORM_DATA:
-      return { ...state, formData: { ...state.formData, ...action.payload } };
     case actionTypes.SET_SELECTED_SERVICE:
       return { ...state, selectedService: action.payload };
     case actionTypes.SET_METHOD:
@@ -50,32 +55,31 @@ const reducer = (state, action) => {
   }
 };
 
-const usePlaceOrder = (initialCartItems, backendUrl, token) => {
+const usePlaceOrder = (cartItems, backendUrl, token) => {
   const [state, dispatch] = useReducer(reducer, initialState);
   const navigate = useNavigate();
+  const citiesCache = useMemo(() => new Map(), []); // Cache to store cities by province
 
-  const citiesCache = useMemo(() => new Map(), []);
-
-  const fetchProvinces = useCallback(async () => {
-    try {
-      const response = await apiCall(`${backendUrl}/api/rajaongkir/provinces`);
-      dispatch({
-        type: actionTypes.SET_PROVINCES,
-        payload: response.data.provinces,
-      });
-    } catch (error) {
-      toast.error("Failed to fetch provinces.");
-    }
+  // Fetch provinces on component mount
+  useEffect(() => {
+    const fetchProvinces = async () => {
+      try {
+        const response = await apiCall(`${backendUrl}/api/rajaongkir/provinces`);
+        dispatch({
+          type: actionTypes.SET_PROVINCES,
+          payload: response.data.provinces,
+        });
+      } catch (error) {
+        toast.error("Failed to fetch provinces.");
+      }
+    };
+    fetchProvinces();
   }, [backendUrl]);
 
-  useEffect(() => {
-    fetchProvinces();
-  }, [fetchProvinces]);
-
+  // Fetch cities based on selected province
   const fetchCities = useCallback(
     async (provinceId) => {
       if (citiesCache.has(provinceId)) {
-        console.log("Menggunakan data kota dari cache.");
         dispatch({
           type: actionTypes.SET_CITIES,
           payload: citiesCache.get(provinceId),
@@ -83,19 +87,11 @@ const usePlaceOrder = (initialCartItems, backendUrl, token) => {
         return;
       }
 
-      console.log("Fetching cities for province:", provinceId);
-      dispatch({ type: actionTypes.SET_LOADING, payload: true });
       try {
-        const response = await apiCall(
-          `${backendUrl}/api/rajaongkir/cities/${provinceId}`
-        );
-        console.log("Cities response:", response.data);
-
-        const cities = response.data || [];
-        console.log("Processed cities:", cities);
-
-        citiesCache.set(provinceId, cities);
-        dispatch({ type: actionTypes.SET_CITIES, payload: cities });
+        dispatch({ type: actionTypes.SET_LOADING, payload: true });
+        const response = await apiCall(`${backendUrl}/api/rajaongkir/cities/${provinceId}`);
+        citiesCache.set(provinceId, response.data);
+        dispatch({ type: actionTypes.SET_CITIES, payload: response.data });
       } catch (error) {
         toast.error("Failed to fetch cities.");
         dispatch({ type: actionTypes.SET_CITIES, payload: [] });
@@ -106,37 +102,35 @@ const usePlaceOrder = (initialCartItems, backendUrl, token) => {
     [backendUrl, citiesCache]
   );
 
-  const handleProvinceChange = useCallback(
-    (provinceId) => {
-      dispatch({
-        type: actionTypes.SET_SELECTED_PROVINCE,
-        payload: provinceId,
-      });
+  // Handle province change, reset city and fetch new cities
+  const handleProvinceChange = (provinceId) => {
+    if (provinceId !== state.selectedProvince) { // Prevent unnecessary updates
+      dispatch({ type: actionTypes.SET_SELECTED_PROVINCE, payload: provinceId });
       dispatch({
         type: actionTypes.SET_FORM_DATA,
         payload: { selectedProvince: provinceId },
       });
-      fetchCities(provinceId);
-      dispatch({ type: actionTypes.SET_SELECTED_CITY, payload: "" });
-      dispatch({
-        type: actionTypes.SET_FORM_DATA,
-        payload: { selectedCity: "" },
-      });
-    },
-    [fetchCities]
-  );
-
-  const handleCityChange = (cityId) => {
-    dispatch({ type: actionTypes.SET_SELECTED_CITY, payload: cityId });
-    dispatch({
-      type: actionTypes.SET_FORM_DATA,
-      payload: { selectedCity: cityId },
-    });
+      fetchCities(provinceId); // Fetch cities for the selected province
+    }
   };
 
+  // Handle city change
+  const handleCityChange = (cityId) => {
+    if (cityId !== state.selectedCity) { // Prevent unnecessary updates
+      dispatch({ type: actionTypes.SET_SELECTED_CITY, payload: cityId });
+      dispatch({
+        type: actionTypes.SET_FORM_DATA,
+        payload: { selectedCity: cityId },
+      });
+    }
+  };
+
+  // Calculate shipping cost based on selected province and city
   const calculateShippingCost = useCallback(async () => {
-    dispatch({ type: actionTypes.SET_LOADING_COST, payload: true });
+    if (!state.selectedCity || !state.selectedProvince) return;
+
     try {
+      dispatch({ type: actionTypes.SET_LOADING_COST, payload: true });
       const response = await apiCall(
         `${backendUrl}/api/rajaongkir/cost`,
         "POST",
@@ -150,77 +144,75 @@ const usePlaceOrder = (initialCartItems, backendUrl, token) => {
       );
       dispatch({ type: actionTypes.SET_COST, payload: response.data });
     } catch (error) {
-      toast.error("Gagal menghitung biaya pengiriman.");
+      toast.error("Failed to calculate shipping cost.");
     } finally {
       dispatch({ type: actionTypes.SET_LOADING_COST, payload: false });
     }
   }, [state.selectedProvince, state.selectedCity, token, backendUrl]);
 
+  // Trigger shipping cost calculation when city or province changes
   useEffect(() => {
     if (state.selectedCity) {
       calculateShippingCost();
     }
   }, [state.selectedCity, calculateShippingCost]);
-  const handleSubmit = async (orderItems, formData) => {
+
+  // Handle order submission (COD or Midtrans)
+  const handleOrderSubmission = async (paymentMethod, orderData) => {
     try {
-      if (!formData || !formData.address) {
-        console.error("Address data is missing");
-        toast.error("Please provide a valid address");
+      // Validate address, province, and city
+      if (!state.formData.address || !state.selectedProvince || !state.selectedCity) {
+        toast.error("Please provide a complete address (address, province, and city).");
         return;
       }
 
-      if (!orderItems || orderItems.length === 0) {
-        console.error("Order items are missing");
+      // Ensure cart is not empty and service is selected
+      if (!cartItems.length) {
         toast.error("Your cart is empty");
         return;
       }
-
       if (!state.selectedService) {
-        console.error("Shipping service is not selected");
         toast.error("Please select a shipping service");
         return;
       }
 
-      const orderData = {
-        address: formData,
-        items: orderItems,
-        amount:
-          orderItems.reduce((total, item) => total + item.totalPrice, 0) +
-          (state.selectedService ? state.selectedService.cost[0].value : 0),
-        shippingService: state.selectedService,
-      };
-
-      console.log("Payload to backend:", orderData);
-
-      const response = await apiCall(
-        `${backendUrl}/api/order/midtrans`,
-        "POST",
-        orderData,
-        token
-      );
-
-      if (!response || !response.data || !response.data.success) {
-        console.error("Invalid response from backend:", response);
-        toast.error("Failed to process your order. Please try again.");
-        return;
+      let response;
+      if (paymentMethod === "midtrans") {
+        response = await apiCall(
+          `${backendUrl}/api/order/midtrans`,
+          "POST",
+          orderData,
+          token
+        );
+      } else if (paymentMethod === "cod") {
+        response = await apiCall(
+          `${backendUrl}/api/order/place`, // Ensure a COD endpoint is set up in the backend
+          "POST",
+          orderData,
+          token
+        );
       }
 
-      console.log("Midtrans Response:", response.data);
-
-      window.snap.pay(response.data.token, {
-        onSuccess: () => {
-          navigate("/orders");
-          toast.success("Order placed successfully!");
-        },
-        onPending: (result) => console.log("Pending:", result),
-        onError: (result) => {
-          console.error("Error:", result);
-          toast.error("Payment failed");
-        },
-        onClose: () => console.log("Closed"),
-      });
+      // Handle backend response
+      if (response && response.data.token) {
+        // Redirect to Midtrans payment page
+        window.snap.pay(response.data.token, {
+          onSuccess: () => {
+            navigate("/orders");
+            toast.success("Order placed successfully!");
+          },
+          onError: () => toast.error("Payment failed"),
+          onClose: () => console.log("Payment closed"),
+        });
+      } else if (response && response.data.success) {
+        // Redirect to orders page for COD or other successful methods
+        navigate("/orders");
+        toast.success("Order placed successfully!");
+      } else {
+        toast.error("Failed to process your order. Please try again.");
+      }
     } catch (error) {
-      console.error("Error placing order:", error);
+      console.error("Error placing order:", error.response?.data || error.message);
       toast.error("Failed to place your order. Please try again.");
     }
   };
@@ -230,8 +222,7 @@ const usePlaceOrder = (initialCartItems, backendUrl, token) => {
     dispatch,
     handleProvinceChange,
     handleCityChange,
-    calculateShippingCost,
-    handleSubmit,
+    handleOrderSubmission,
   };
 };
 

@@ -45,7 +45,7 @@ const populateCartData = (user) => {
 export const getUserCart = async (req, res) => {
   try {
     const userId = req.user._id || req.params.userId || req.query.userId;
-
+    
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ success: false, message: "Invalid userId" });
     }
