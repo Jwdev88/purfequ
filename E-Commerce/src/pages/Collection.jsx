@@ -1,10 +1,11 @@
-import React, { useContext, useMemo, useReducer, useState, useCallback } from "react";
+import React, { useContext, useMemo, useReducer, useState, useCallback,useEffect } from "react";
 import { ShopContext } from "../context/ShopContext";
 import { assets } from "../assets/assets";
 import Title from "../components/Title";
 import ProductItem from "../components/ProductItem";
 import Pagination from "../components/Pagination"; // Tailwind Pagination component
 import { debounce } from "lodash"; // Import debounce from lodash
+import { Loader } from "lucide-react"; // Import Loader for loading state
 
 // Initial state for filters
 const initialState = {
@@ -27,9 +28,7 @@ const reducer = (state, action) => {
       return {
         ...state,
         selectedSubCategory: state.selectedSubCategory.includes(action.payload)
-          ? state.selectedSubCategory.filter(
-              (subCat) => subCat !== action.payload
-            )
+          ? state.selectedSubCategory.filter((subCat) => subCat !== action.payload)
           : [...state.selectedSubCategory, action.payload],
       };
     case "SET_SORT_TYPE":
@@ -40,11 +39,13 @@ const reducer = (state, action) => {
 };
 
 const Collection = () => {
-  const { products, categories, subCategories, search, showSearch,formatIDR  , setSearch } =
+  const { products, categories, subCategories, search, showSearch, formatIDR, setSearch } =
     useContext(ShopContext);
 
   const [state, dispatch] = useReducer(reducer, initialState);
   const [currentPage, setCurrentPage] = useState(1);
+  const [loading, setLoading] = useState(false); // Loading state
+  const [error, setError] = useState(null); // Error state
   const itemsPerPage = 10;
 
   // Create a debounced version of setSearch to limit how often it gets triggered
@@ -116,6 +117,21 @@ const Collection = () => {
     dispatch({ type: "TOGGLE_SUBCATEGORY", payload: value });
   };
 
+  // Handle loading and error states
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Simulate loading for better UX
+      setTimeout(() => {
+        setLoading(false);
+      }, 500);
+    } catch (err) {
+      setError("Terjadi kesalahan saat memuat produk.");
+      setLoading(false);
+    }
+  }, [filteredProducts]);
+
   return (
     <div className="flex flex-col sm:flex-row gap-1 sm:gap-10 pt-10 border-t">
       {/* Filter Section */}
@@ -130,7 +146,7 @@ const Collection = () => {
         </p>
 
         {/* Categories */}
-        <div className="border border-gray-300 p-5 mt-6">
+        <div className="border border-gray-300 p-5 mt-6 rounded-lg shadow-sm">
           <p className="mb-3 text-sm font-medium text-gray-800">CATEGORIES</p>
           <div className="flex flex-col gap-2 text-sm font-light text-gray-700">
             {categories && categories.length > 0 ? (
@@ -152,7 +168,7 @@ const Collection = () => {
         </div>
 
         {/* Subcategories */}
-        <div className="border border-gray-300 p-5 mt-6">
+        <div className="border border-gray-300 p-5 mt-6 rounded-lg shadow-sm">
           <p className="mb-3 text-sm font-medium text-gray-800">SUBCATEGORIES</p>
           <div className="flex flex-col gap-2 text-sm font-light text-gray-700">
             {subCategories && subCategories.length > 0 ? (
@@ -190,31 +206,50 @@ const Collection = () => {
           </select>
         </div>
 
-        {/* Product Items */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 gap-y-6">
-          {paginatedProducts.length > 0 ? (
-            paginatedProducts.map((item) => (
-              <ProductItem
-                key={item._id}
-                name={item.name}
-                id={item._id}
-                price={formatIDR(item.price)} // Ensure price is formatted properly
-                image={item.image}
-              />
-            ))
-          ) : (
-            <p className="text-center mt-4 text-lg">No products found for the selected filters.</p>
-          )}
-        </div>
+        {/* Loading State */}
+        {loading && (
+          <div className="flex justify-center items-center h-64">
+            <Loader className="animate-spin w-8 h-8" />
+            <p className="ml-2">Memuat produk...</p>
+          </div>
+        )}
 
-        {/* Pagination */}
-        <div className="mt-6">
-          <Pagination
-            currentPage={currentPage}
-            totalPages={Math.ceil(filteredProducts.length / itemsPerPage)}
-            onPageChange={(page) => setCurrentPage(page)}
-          />
-        </div>
+        {/* Error State */}
+        {error && (
+          <div className="text-center text-red-600 py-8">{error}</div>
+        )}
+
+        {/* Product Items */}
+        {!loading && !error && (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 gap-y-6">
+              {paginatedProducts.length > 0 ? (
+                paginatedProducts.map((item) => (
+                  <ProductItem
+                    key={item._id}
+                    name={item.name}
+                    id={item._id}
+                    price={formatIDR(item.price)} // Ensure price is formatted properly
+                    image={item.image}
+                  />
+                ))
+              ) : (
+                <p className="text-center mt-4 text-lg col-span-full">
+                  No products found for the selected filters.
+                </p>
+              )}
+            </div>
+
+            {/* Pagination */}
+            <div className="mt-6">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={Math.ceil(filteredProducts.length / itemsPerPage)}
+                onPageChange={(page) => setCurrentPage(page)}
+              />
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

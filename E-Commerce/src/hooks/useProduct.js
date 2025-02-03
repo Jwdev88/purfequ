@@ -1,6 +1,7 @@
 import { useReducer, useEffect, useCallback, useContext } from "react";
-import { toast } from "react-toastify";
 import { ShopContext } from "../context/ShopContext";
+import { useNavigate } from "react-router-dom"; // Import useNavigate
+import { notifySuccess, notifyError,notifyWarningWithAction } from "../components/ToastNotification";
 
 const initialState = {
   productData: null,
@@ -17,7 +18,6 @@ const actionTypes = {
   SET_LOADING: "SET_LOADING",
   SET_ADDING_TO_CART: "SET_ADDING_TO_CART",
 };
-
 const reducer = (state, action) => {
   switch (action.type) {
     case actionTypes.SET_PRODUCT_DATA:
@@ -44,7 +44,7 @@ const reducer = (state, action) => {
 export const useProduct = (productId) => {
   const { products, addToCart } = useContext(ShopContext);
   const [state, dispatch] = useReducer(reducer, initialState);
-
+  const navigate = useNavigate(); // Inisialisasi useNavigate
   // Fetch product data
   useEffect(() => {
     if (!products.length) return;
@@ -53,15 +53,16 @@ export const useProduct = (productId) => {
     if (product) {
       dispatch({ type: actionTypes.SET_PRODUCT_DATA, payload: product });
     } else {
-      toast.error("Produk tidak ditemukan.");
+      notifyError("Produk tidak ditemukan.");
       dispatch({ type: actionTypes.SET_LOADING, payload: false });
     }
   }, [productId, products]);
 
   // Handle variant change
   const handleVariantChange = useCallback((variantName, option, variantId) => {
+
     if (!option || option.stock <= 0) {
-      toast.error("Varian tidak tersedia.");
+      notifyError("Varian tidak tersedia.");
       return;
     }
 
@@ -84,8 +85,13 @@ export const useProduct = (productId) => {
 
   // Handle adding product to cart
   const handleAddToCart = useCallback(async () => {
-    if (!state.productData) {
-      toast.error("Produk tidak valid.");
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      notifyWarningWithAction({
+        message: "Silakan login untuk menambahkan ke keranjang.",
+        onConfirm: () => navigate("/login"),
+      });
       return;
     }
 
@@ -96,7 +102,7 @@ export const useProduct = (productId) => {
       hasVariants &&
       (!state.selectedVariant || !state.selectedVariant.optionId)
     ) {
-      toast.error("Harap pilih varian sebelum menambahkan ke keranjang.");
+      notifyError("Harap pilih varian sebelum menambahkan ke keranjang.");
       return;
     }
 
@@ -115,5 +121,6 @@ export const useProduct = (productId) => {
     state,
     handleVariantChange,
     handleAddToCart,
+    dispatch,
   };
 };

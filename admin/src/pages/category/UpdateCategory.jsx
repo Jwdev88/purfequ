@@ -13,6 +13,10 @@ import {
   Textarea,
   Spinner,
   Image,
+  Heading,
+  Grid,
+  GridItem,
+  Stack,
 } from "@chakra-ui/react";
 
 const UpdateCategory = ({ token }) => {
@@ -29,7 +33,7 @@ const UpdateCategory = ({ token }) => {
   });
 
   const navigate = useNavigate();
-// 
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormValues({ ...formValues, [name]: value });
@@ -54,10 +58,7 @@ const UpdateCategory = ({ token }) => {
         `${backendURI}/api/category/edit/${categoryId}`,
         formData,
         {
-          headers: {
-            token,
-            "Content-Type": "multipart/form-data",
-          },
+          headers: { token, "Content-Type": "multipart/form-data" },
         }
       );
 
@@ -86,34 +87,25 @@ const UpdateCategory = ({ token }) => {
         );
 
         if (!response?.data?.success) {
-          const errorMessage =
-            response?.data?.message || "Gagal mengambil data kategori";
-          toast.error(errorMessage);
-          setError(errorMessage);
-          return;
+          throw new Error(
+            response?.data?.message || "Gagal mengambil data kategori"
+          );
         }
 
         if (!response?.data?.category) {
-          toast.error("Data kategori tidak ditemukan");
-          setError("Data kategori tidak ditemukan");
-          return;
+          throw new Error("Data kategori tidak ditemukan");
         }
 
         const categoryData = response.data.category;
-
-        setInitialImage(categoryData.imageData[0].secure_urls);
-
+        setInitialImage(categoryData.image);
         setFormValues({
           name: categoryData.name || "",
           description: categoryData.description || "",
           status: categoryData.status || "active",
-          image: null,
         });
       } catch (err) {
-        const errorMessage =
-          err.message || "Terjadi kesalahan saat memuat data.";
-        setError(errorMessage);
-        toast.error(errorMessage);
+        setError(err.message || "Terjadi kesalahan saat memuat data.");
+        toast.error(error?.message || "Terjadi kesalahan");
       } finally {
         setLoading(false);
       }
@@ -126,77 +118,84 @@ const UpdateCategory = ({ token }) => {
     }
   }, [categoryId, token]);
 
-  if (loading) {
-    return (
-      <Box className="flex justify-center items-center h-screen">
-        <Spinner size="xl" />
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Box className="flex justify-center items-center h-screen">
-        <p>{error}</p>
-      </Box>
-    );
-  }
+  if (loading) return <Spinner size="xl" />;
+  if (error) return <p>{error}</p>;
 
   return (
-    <Box as="form" onSubmit={onSubmitHandler} p={4} className="flex flex-col md:w-2/3">
-      {(initialImage || imagePreview) && (
-        <Box mb={4}>
-          <Image
-            src={imagePreview || initialImage}
-            alt="Category Image"
-            maxW="xs"
-          />
-        </Box>
-      )}
+    <form onSubmit={onSubmitHandler}>
+      <Box maxW="7xl" mx="auto" px={{ base: 4, md: 6 }} py={8}>
+        <Heading as="h1" size="xl" textAlign="center" mb={8}>
+          Ubah Kategori
+        </Heading>
 
-<FormControl mb={4}>
-        <FormLabel>Upload Gambar</FormLabel>
-        <Input type="file" onChange={handleImageChange} />
-        {imagePreview && <Image src={imagePreview} alt="Image Preview" mt={2} />}
-      </FormControl>
+        <Grid templateColumns={{ base: "1fr", md: "1fr 1fr" }} gap={6}>
+          <GridItem>
+            {" "}
+            {/* Kolom kiri untuk gambar */}
+            <FormControl mb={4}>
+              <FormLabel>Gambar Kategori</FormLabel>
+              <Input type="file" onChange={handleImageChange} />
+              {/* Periksa jika imagePreview atau initialImage ada */}
+              {imagePreview || initialImage ? (
+                <Image
+                src={imagePreview || initialImage}
+                alt="Gambar Kategori"
+                width="100%"
+                height="100%"
+                />
+              ) : (
+                <Text>Gambar tidak tersedia.</Text>
+              )}
+            </FormControl>
+          </GridItem>
 
-      <FormControl mb={4}>
-        <FormLabel>Nama Category</FormLabel>
-        <Input
-          name="name"
-          value={formValues.name}
-          onChange={handleInputChange}
-          required
-        />
-      </FormControl>
+          <GridItem>
+            <FormControl id="name" mb={4} isRequired>
+              <FormLabel>Nama Kategori</FormLabel>
+              <Input
+                type="text"
+                name="name"
+                value={formValues.name}
+                onChange={handleInputChange}
+                required
+              />
+            </FormControl>
 
-      <FormControl mb={4}>
-        <FormLabel>Description Category</FormLabel>
-        <Textarea
-          name="description"
-          value={formValues.description}
-          onChange={handleInputChange}
-          required
-        />
-      </FormControl>
+            <FormControl id="description" mb={4}>
+              <FormLabel>Deskripsi</FormLabel>
+              <Textarea
+                name="description"
+                value={formValues.description}
+                onChange={handleInputChange}
+              />
+            </FormControl>
 
-      <FormControl mb={4}>
-        <FormLabel>Status Category</FormLabel>
-        <Select
-          name="status"
-          value={formValues.status}
-          onChange={handleInputChange}
-          required
-        >
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </Select>
-      </FormControl>
+            <FormControl id="status" mb={4}>
+              <FormLabel>Status</FormLabel>
+              <Select
+                name="status"
+                value={formValues.status}
+                onChange={handleInputChange}
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </Select>
+            </FormControl>
+          </GridItem>
+        </Grid>
 
-      <Button type="submit" colorScheme="blue" mt={10}>
-        Update Category
-      </Button>
-    </Box>
+        <Stack mt={6} spacing={4} justify="center">
+          <Button
+            type="submit"
+            colorScheme="blue"
+            width={{ base: "100%", sm: "auto" }}
+            isLoading={loading}
+          >
+            Update Category
+          </Button>
+        </Stack>
+      </Box>
+    </form>
   );
 };
 

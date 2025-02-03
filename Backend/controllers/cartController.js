@@ -24,6 +24,8 @@ const populateCartData = (user) => {
       productImages: product.images,
       productPrice: product.price,
       productStock: product.stock,
+      productSku: product.sku,
+      productWeight: product.weight,
       productBestSeller: product.bestSeller,
       quantity: item.quantity,
       variant: selectedVariant ? {

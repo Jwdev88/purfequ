@@ -321,11 +321,11 @@ const AddProduct = ({ token }) => {
     <Box as="form" onSubmit={onSubmitHandler}>
     <Flex
       direction="column"
-      gap={{ base: 4, md: 6 }}
-      px={{ base: 4, md: 8 }}
-      py={{ base: 6, md: 8 }}
-      maxWidth="4xl"
-      mx="auto"
+      mb={4}
+      mt={4}
+      gap={4}
+     
+   
     >
       <Text fontSize={{ base: 'xl', md: '2xl' }} fontWeight="bold" mb={2}>
         Tambahkan Produk

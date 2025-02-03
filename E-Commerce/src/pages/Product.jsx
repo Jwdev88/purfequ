@@ -7,9 +7,11 @@ import { useProduct } from "../hooks/useProduct";
 
 const Product = () => {
   const { productId } = useParams();
-  const { addToCart, products, formatIDR } = useContext(ShopContext);
-  const { state, handleVariantChange, handleAddToCart } = useProduct(productId);
+  const { formatIDR } = useContext(ShopContext);
+  const { state, handleVariantChange, handleAddToCart, dispatch } =
+    useProduct(productId);
 
+  
   if (state.isLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -40,11 +42,12 @@ const Product = () => {
           </div>
           <div className="flex sm:flex-col gap-2 overflow-auto sm:w-[20%]">
             {state.productData.images.map((item, index) => (
+              // Product.jsx
               <img
                 key={index}
                 onClick={() =>
                   dispatch({
-                    type: actionTypes.SET_SELECTED_IMAGE,
+                    type: "SET_SELECTED_IMAGE", // Use the string directly
                     payload: item,
                   })
                 }

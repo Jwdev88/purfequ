@@ -1,5 +1,5 @@
 import { useReducer, useCallback, useEffect, useMemo } from "react";
-import { toast } from "react-toastify";
+import { notifySuccess, notifyError,notifyWarningWithAction } from "../components/ToastNotification";
 import { useNavigate } from "react-router-dom";
 import { actionTypes } from "../context/actionTypes";
 import { apiCall } from "../utils/apiCall";
@@ -59,7 +59,6 @@ const usePlaceOrder = (cartItems, backendUrl, token) => {
   const [state, dispatch] = useReducer(reducer, initialState);
   const navigate = useNavigate();
   const citiesCache = useMemo(() => new Map(), []); // Cache to store cities by province
-
   // Fetch provinces on component mount
   useEffect(() => {
     const fetchProvinces = async () => {
@@ -70,7 +69,7 @@ const usePlaceOrder = (cartItems, backendUrl, token) => {
           payload: response.data.provinces,
         });
       } catch (error) {
-        toast.error("Failed to fetch provinces.");
+        notifyError("Failed to fetch provinces.");
       }
     };
     fetchProvinces();
@@ -93,7 +92,7 @@ const usePlaceOrder = (cartItems, backendUrl, token) => {
         citiesCache.set(provinceId, response.data);
         dispatch({ type: actionTypes.SET_CITIES, payload: response.data });
       } catch (error) {
-        toast.error("Failed to fetch cities.");
+        notifyError("Failed to fetch cities.");
         dispatch({ type: actionTypes.SET_CITIES, payload: [] });
       } finally {
         dispatch({ type: actionTypes.SET_LOADING, payload: false });
@@ -125,30 +124,41 @@ const usePlaceOrder = (cartItems, backendUrl, token) => {
     }
   };
 
-  // Calculate shipping cost based on selected province and city
-  const calculateShippingCost = useCallback(async () => {
-    if (!state.selectedCity || !state.selectedProvince) return;
+const calculateShippingCost = useCallback(async () => {
+  if (!state.selectedCity || !state.selectedProvince) return;
 
-    try {
-      dispatch({ type: actionTypes.SET_LOADING_COST, payload: true });
-      const response = await apiCall(
-        `${backendUrl}/api/rajaongkir/cost`,
-        "POST",
-        {
-          origin: state.selectedProvince,
-          destination: state.selectedCity,
-          weight: 1,
-          courier: "jne",
-        },
-        token
-      );
-      dispatch({ type: actionTypes.SET_COST, payload: response.data });
-    } catch (error) {
-      toast.error("Failed to calculate shipping cost.");
-    } finally {
-      dispatch({ type: actionTypes.SET_LOADING_COST, payload: false });
-    }
-  }, [state.selectedProvince, state.selectedCity, token, backendUrl]);
+  const totalWeight = cartItems.reduce((total, item) => {
+    // Check if the item has a variant and use the optionWeight from the selected variant if available
+    const itemWeight = item.variant?.selectedOption?.optionWeight ?? item.productWeight ?? 0;
+    return total + (itemWeight * item.quantity);
+  }, 0);
+  // Pastikan berat total tidak 0
+  if (totalWeight === 0) {
+    notifyError("Total weight cannot be zero");
+    return;
+  }
+
+  try {
+    dispatch({ type: actionTypes.SET_LOADING_COST, payload: true });
+    const response = await apiCall(
+      `${backendUrl}/api/rajaongkir/cost`,
+      "POST",
+      {
+        origin: state.selectedProvince,
+        destination: state.selectedCity,
+        weight: totalWeight,  // Menggunakan total berat produk
+        courier: "jne",
+      },
+      token
+    );
+    dispatch({ type: actionTypes.SET_COST, payload: response.data });
+  } catch (error) {
+    notifyError("Failed to calculate shipping cost.");
+  } finally {
+    dispatch({ type: actionTypes.SET_LOADING_COST, payload: false });
+  }
+}, [state.selectedProvince, state.selectedCity, cartItems, token, backendUrl]);
+
 
   // Trigger shipping cost calculation when city or province changes
   useEffect(() => {
@@ -162,17 +172,17 @@ const usePlaceOrder = (cartItems, backendUrl, token) => {
     try {
       // Validate address, province, and city
       if (!state.formData.address || !state.selectedProvince || !state.selectedCity) {
-        toast.error("Please provide a complete address (address, province, and city).");
+        notifyError("Please provide a complete address (address, province, and city).");
         return;
       }
 
       // Ensure cart is not empty and service is selected
       if (!cartItems.length) {
-        toast.error("Your cart is empty");
+        notifyError("Your cart is empty");
         return;
       }
       if (!state.selectedService) {
-        toast.error("Please select a shipping service");
+        notifyError("Please select a shipping service");
         return;
       }
 
@@ -199,21 +209,19 @@ const usePlaceOrder = (cartItems, backendUrl, token) => {
         window.snap.pay(response.data.token, {
           onSuccess: () => {
             navigate("/orders");
-            toast.success("Order placed successfully!");
+            notifySuccess("Order placed successfully!");
           },
-          onError: () => toast.error("Payment failed"),
-          onClose: () => console.log("Payment closed"),
+          onError: () => notifyError("Payment failed"),
         });
       } else if (response && response.data.success) {
         // Redirect to orders page for COD or other successful methods
         navigate("/orders");
-        toast.success("Order placed successfully!");
+        notifySuccess("Order placed successfully!");
       } else {
-        toast.error("Failed to process your order. Please try again.");
+        notifyError("Failed to process your order. Please try again.");
       }
     } catch (error) {
-      console.error("Error placing order:", error.response?.data || error.message);
-      toast.error("Failed to place your order. Please try again.");
+      notifyError("Failed to place your order. Please try again.");
     }
   };
 

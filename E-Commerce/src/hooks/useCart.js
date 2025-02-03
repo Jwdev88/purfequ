@@ -1,5 +1,7 @@
 import { useReducer, useEffect, useCallback } from "react";
-import { toast } from "react-toastify";
+import { notifySuccess, notifyError,notifyWarningWithAction } from "../components/ToastNotification";
+
+
 
 const actionTypes = {
   SET_CART_DATA: "SET_CART_DATA",
@@ -7,15 +9,17 @@ const actionTypes = {
   UPDATE_QUANTITY: "UPDATE_QUANTITY",
   REMOVE_ITEM: "REMOVE_ITEM",
   CLEAR_CART: "CLEAR_CART",
-};
-const formatCartItemData = (item) => {
+};const formatCartItemData = (item) => {
   if (!item || !item.productId) {
-    // console.error('Item is invalid or does not have productId:', item); // Log untuk debugging
     return null; // Abaikan item yang tidak valid
   }
-  // console.log('Formatting item:', JSON.stringify(item)); // Log untuk debugging
-  const itemPrice = parseFloat(item.variant?.selectedOption?.optionPrice ?? item.productPrice ?? 0); // Ambil harga item dari varian yang dipilih atau harga produk
-  const itemQuantity = parseInt(item.quantity, 10) || 1; // Pastikan kuantitas item adalah angka
+
+  const itemPrice = parseFloat(item.variant?.selectedOption?.optionPrice ?? item.productPrice ?? 0);
+  const itemQuantity = parseInt(item.quantity, 10) || 1;
+  
+  // Mengambil berat dari varian jika ada, jika tidak ada maka gunakan berat default (misalnya 0)
+  const itemWeight = item.variant?.selectedOption?.weight ?? 0;
+
   return {
     productId: item.productId,
     productName: item.productName || "Unknown Product",
@@ -28,10 +32,12 @@ const formatCartItemData = (item) => {
     optionId: item.variant?.selectedOption?.optionId || null,
     optionName: item.variant?.selectedOption?.optionName || "No Option",
     optionPrice: itemPrice,
+    weight: itemWeight,  // Menambahkan berat pada format item
     quantity: itemQuantity,
     totalPrice: itemPrice * itemQuantity,
   };
 };
+
 
 const cartReducer = (state, action) => {
   switch (action.type) {
@@ -73,7 +79,7 @@ export const useCart = (cartItems, updateQuantity, removeItemFromCart, clearCart
   const handleQuantityChange = useCallback(
     async (productId, variantId, optionId, newQuantity) => {
       if (!productId || newQuantity < 1) {
-        toast.error("Kuantitas tidak valid.");
+        notifyError("Kuantitas tidak valid.");
         return;
       }
 
@@ -82,13 +88,11 @@ export const useCart = (cartItems, updateQuantity, removeItemFromCart, clearCart
         if (!updatedCartItems || !Array.isArray(updatedCartItems)) {
           throw new Error("Gagal memperbarui kuantitas."); // Tambahkan pengecekan validitas data
         }
-        // console.log('Data keranjang yang diperbarui:', updatedCartItems); // Log untuk debugging
         const formattedCartData = updatedCartItems.map(formatCartItemData).filter(item => item !== null);
         dispatch({ type: actionTypes.SET_CART_DATA, payload: formattedCartData });
-        toast.success("Kuantitas berhasil diperbarui.");
+        notifySuccess("Kuantitas berhasil diperbarui.");
       } catch (error) {
-        // console.error("Error memperbarui kuantitas:", error);
-        toast.error("Gagal memperbarui kuantitas.");
+        notifyError("Gagal memperbarui kuantitas.");
       }
     },
     [updateQuantity]
@@ -99,10 +103,9 @@ export const useCart = (cartItems, updateQuantity, removeItemFromCart, clearCart
       try {
         await removeItemFromCart(productId, variantId, optionId);
         dispatch({ type: actionTypes.REMOVE_ITEM, payload: { productId, variantId, optionId } });
-        toast.success("Item berhasil dihapus dari keranjang.", );
+        notifySuccess("Item berhasil dihapus dari keranjang.", );
       } catch (error) {
-        // console.error("Error menghapus item:", error);
-        toast.error("Gagal menghapus item.");
+        notifyError("Gagal menghapus item.");
       }
     },
     [removeItemFromCart]
@@ -114,10 +117,9 @@ export const useCart = (cartItems, updateQuantity, removeItemFromCart, clearCart
       try {
         await clearCart();
         dispatch({ type: actionTypes.CLEAR_CART });
-        toast.success("Keranjang berhasil dikosongkan.");
+        notifySuccess("Keranjang berhasil dikosongkan.");
       } catch (error) {
-        console.error("Error mengosongkan keranjang:", error);
-        toast.error("Gagal mengosongkan keranjang.");
+        notifyError("Gagal mengosongkan keranjang.");
       }
     },
     [clearCart]

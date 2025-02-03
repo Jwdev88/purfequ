@@ -1,18 +1,22 @@
 import React, { useContext, useEffect, useState } from "react";
 import { ShopContext } from "../context/ShopContext";
 import axios from "axios";
+import { Loader } from "lucide-react";
 
 const Orders = () => {
-  const { backendUrl, token, currency } = useContext(ShopContext);
-  const [orderData, setOrderData] = useState(null);
+  const { backendUrl, token, formatIDR } = useContext(ShopContext);
+  const [orderData, setOrderData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedOrderItem, setSelectedOrderItem] = useState(null); // Untuk menyimpan item yang diklik
-
+  const [expandedOrder, setExpandedOrder] = useState(null);
+  const calculateTotal = (items, shippingCost) => {
+    const subtotal = items.reduce((total, item) => total + item.price * item.quantity, 0);
+    return subtotal + shippingCost;
+  };
   const loadOrderData = async () => {
     try {
       if (!token) {
-        setError("No token provided");
+        setError("Tidak ada token yang diberikan");
         return;
       }
 
@@ -25,10 +29,10 @@ const Orders = () => {
       if (response.data.success) {
         setOrderData(response.data.orders);
       } else {
-        setError("Failed to fetch orders");
+        setError("Gagal mengambil data order");
       }
     } catch (error) {
-      setError("Error fetching order data");
+      setError("Terjadi kesalahan saat mengambil data order");
     } finally {
       setLoading(false);
     }
@@ -41,154 +45,75 @@ const Orders = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center py-8 text-xl">
-        Loading...
+        <Loader className="animate-spin w-8 h-8" /> Sedang memuat...
       </div>
     );
   }
 
   if (error) {
-    return (
-      <div className="flex justify-center items-center py-8 text-xl text-red-600">
-        {error}
-      </div>
-    );
+    return <div className="text-center text-red-600 py-8">{error}</div>;
   }
 
   return (
     <div className="container mx-auto px-4 py-8">
-      {orderData && orderData.length > 0 ? (
-        orderData.map((order) => (
-          <div
-            key={order._id}
-            className="bg-white shadow-lg rounded-lg p-6 mb-8"
-          >
-            <h2 className="text-2xl font-semibold mb-4">
-              Order ID: {order._id}
-            </h2>
+      {orderData.length > 0 ? (
+        <div className="max-h-[70vh] overflow-y-auto p-2 border rounded-lg shadow-sm bg-gray-50">
+          {orderData.map((order) => (
+            <div key={order._id} className="bg-white shadow-md rounded-lg p-6 mb-6">
+              <h2 className="text-2xl font-semibold">ID Order: {order._id}</h2>
+              <div className="mt-2 text-gray-700">
+                <p>Status: <span className="font-semibold">{order.status === "pending" ? "Menunggu Pembayaran" : order.status}</span></p>
+                <p>Metode Pembayaran: {order.paymentMethod}</p>
+                <p className="text-gray-700">Subtotal: {formatIDR(calculateTotal(order.items, 0))}</p>
+                <p>Biaya Pengiriman: {formatIDR(order.ongkir)}</p>
+                <p className="text-gray-700 font-semibold">Total Order: {formatIDR(calculateTotal(order.items, order.ongkir))}</p>
+                <p className="text-sm text-gray-500">Tanggal Order: {new Date(order.date).toLocaleDateString("id-ID", {
+                  weekday: "long", year: "numeric", month: "long", day: "numeric"
+                })}</p>
+              </div>
 
-            {/* Order Address */}
-            <div className="mb-6">
-              <h3 className="text-xl font-semibold">Address</h3>
-              <p>
-                {order.address.firstName} {order.address.lastName}
-              </p>
-              <p>{order.address.address}</p>
-              <p>
-                {order.address.city}, {order.address.province}
-              </p>
-              <p>Phone: {order.address.phone}</p>
-              <p>Email: {order.address.email}</p>
-            </div>
+              <button
+                className="mt-4 w-full bg-gray-200 hover:bg-gray-300 p-3 rounded-lg font-semibold transition"
+                onClick={() => setExpandedOrder(expandedOrder === order._id ? null : order._id)}
+              >
+                {expandedOrder === order._id ? "Sembunyikan Item Order" : "Tampilkan Item Order"}
+              </button>
 
-            {/* Order Status and Payment Info */}
-            <div className="mb-6">
-              <h3 className="text-xl font-semibold">Order Status</h3>
-              <p className="text-gray-700">
-                Status:{" "}
-                {order.status === "pending" && (
-                  <a
-                    href={`https://app.sandbox.midtrans.com/snap/v2/vtweb/${order.transactionToken}`}
-                    target="_blank"
-                  >
-                    Lanjutkan Pembayaran
-                  </a>
-                )}
-              </p>
-              <p className="text-gray-700">
-                Payment Method: {order.paymentMethod}
-              </p>
-              <p className="text-gray-700">
-                Total Amount: {currency} {order.amount}
-              </p>
-            </div>
-
-            {/* Order Items */}
-            <div className="mb-4">
-              <h3 className="text-xl font-semibold mb-4">Items Ordered</h3>
-              <div className="max-h-80 overflow-y-auto">
-                {order.items.map((item, index) => (
-                  <div
-                    key={index}
-                    className="flex mb-4 p-4 border rounded-lg bg-gray-50 shadow-sm cursor-pointer hover:bg-gray-200"
-                    onClick={() => setSelectedOrderItem(item)} // Mengatur item yang dipilih
-                  >
-                    {/* Menampilkan hanya satu gambar */}
-                    <div className="flex-shrink-0">
-                      {item.productImages && item.productImages.length > 0 && (
-                        <img
-                          src={item.productImages[0]} // Menampilkan gambar pertama
-                          alt={item.productName}
-                          className="w-24 h-24 object-cover rounded-md"
-                        />
-                      )}
-                    </div>
-
-                    {/* Informasi item */}
-                    <div className="ml-4 flex-1">
-                      <h4 className="font-semibold text-lg">
-                        {item.productName}
-                      </h4>
-                      <p className="text-gray-700">Quantity: {item.quantity}</p>
-                      <p className="text-gray-700">
-                        Price: {currency} {item.price}
-                      </p>
-                      {item.variant && item.variant.selectedOption && (
+              {expandedOrder === order._id && (
+                <div className="mt-4 bg-gray-100 p-4 rounded-lg shadow-inner max-h-60 overflow-y-auto">
+                  <h3 className="text-xl font-semibold mb-4">Item yang Dipesan</h3>
+                  {order.items.map((item, index) => (
+                    <div key={index} className="flex gap-4 items-center p-3 border rounded-lg bg-white shadow-sm">
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        className="w-20 h-20 object-cover rounded-md"
+                      />
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-lg">{item.name}</h4>
+                        <p>Jumlah: {item.quantity}</p>
+                        <p>Harga: {formatIDR(item.price)}</p>
+                        <p>Variant: {item.variant?.name || "Tidak ada"} </p>
+                        {item.variant && item.variant.selectedOption && (
                         <>
                           <p className="text-gray-700">
                             Variant: {item.variant.variantName}
                           </p>
                           <p className="text-gray-700">
-                            Option: {item.variant.selectedOption.optionName}
+                            Opsi: {item.variant.selectedOption.optionName}
                           </p>
                         </>
                       )}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Menampilkan detail item yang dipilih */}
-            {selectedOrderItem && (
-              <div className="mt-6 p-4 border rounded-lg bg-gray-50 shadow-sm">
-                <h4 className="text-xl font-semibold">Selected Item Details</h4>
-                <div className="flex">
-                  <img
-                    src={selectedOrderItem.productImages[0]} // Menampilkan gambar pertama
-                    alt={selectedOrderItem.productName}
-                    className="w-32 h-32 object-cover rounded-md"
-                  />
-                  <div className="ml-4">
-                    <h5 className="text-lg font-semibold">
-                      {selectedOrderItem.productName}
-                    </h5>
-                    <p>Quantity: {selectedOrderItem.quantity}</p>
-                    <p>
-                      Price: {currency} {selectedOrderItem.price}
-                    </p>
-                    {selectedOrderItem.variant &&
-                      selectedOrderItem.variant.selectedOption && (
-                        <>
-                          <p>
-                            Variant: {selectedOrderItem.variant.variantName}
-                          </p>
-                          <p>
-                            Option:{" "}
-                            {
-                              selectedOrderItem.variant.selectedOption
-                                .optionName
-                            }
-                          </p>
-                        </>
-                      )}
-                  </div>
+                  ))}
                 </div>
-              </div>
-            )}
-          </div>
-        ))
+              )}
+            </div>
+          ))}
+        </div>
       ) : (
-        <p className="text-center text-xl">No orders found.</p>
+        <p className="text-center text-xl">Tidak ada order yang ditemukan.</p>
       )}
     </div>
   );

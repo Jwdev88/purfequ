@@ -7,39 +7,65 @@ import { actionTypes } from "../context/actionTypes";
 import PaymentMethodCOD from "./PaymentMethodCOD";
 import PaymentMethodMidtrans from "./PaymentMethodMidtrans";
 
-const InputField = ({ label, name, value, onChange, type = "text", ...props }) => (
-  <div>
-    <label className="block font-semibold">{label}</label>
+const InputField = ({
+  label,
+  name,
+  value,
+  onChange,
+  type = "text",
+  error = "",
+}) => (
+  <div className={`space-y-2`}>
+    <label htmlFor={name} className="block font-semibold">
+      {label}
+    </label>
     {type === "textarea" ? (
       <textarea
+        id={name}
         name={name}
         value={value}
         onChange={onChange}
-        className="w-full p-2 border border-gray-300 rounded"
+        className={`w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 ${
+          error ? "border-red-500" : "border-gray-300"
+        }`}
         rows={3}
-        {...props}
       />
     ) : (
       <input
+        id={name}
         type={type}
         name={name}
         value={value}
         onChange={onChange}
-        className="w-full p-2 border border-gray-300 rounded"
-        {...props}
+        className={`w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 ${
+          error ? "border-red-500" : "border-gray-300"
+        }`}
       />
     )}
+    {error && <p className="text-sm text-red-500">{error}</p>}
   </div>
 );
 
-const SelectField = ({ label, value, onChange, options, disabled = false }) => (
-  <div>
-    <label className="block font-semibold">{label}</label>
+const SelectField = ({
+  label,
+  value,
+  onChange,
+  options,
+  disabled = false,
+  error = "",
+}) => (
+  <div className="space-y-2">
+    <label htmlFor={label} className="block font-semibold">
+      {label}
+    </label>
     <select
+      id={label}
       value={value}
       onChange={onChange}
       disabled={disabled}
-      className="w-full p-2 border border-gray-300 rounded"
+      className={`w-full p-3 border rounded-md focus:outline-none focus:ring-2 ${
+        error ? "border-red-500" : "border-gray-300"
+      }`}
     >
       <option value="">Select {label}</option>
       {options.map((option) => (
@@ -48,6 +74,7 @@ const SelectField = ({ label, value, onChange, options, disabled = false }) => (
         </option>
       ))}
     </select>
+    {error && <p className="text-sm text-red-500">{error}</p>}
   </div>
 );
 
@@ -70,9 +97,9 @@ const PlaceOrderForm = ({
     });
 
   return (
-    <div className="space-y-4 flex-1">
+    <div className="space-y-6 flex-1">
       <Title text1="DELIVERY" text2="INFORMATION" />
-      <div className="space-x-4 flex w-full">
+      <div className="space-x-4 flex w-full flex-wrap">
         <InputField
           label="First Name"
           name="firstName"
@@ -134,14 +161,20 @@ const PlaceOrderForm = ({
 
       {isLoadingCost ? (
         <div className="flex justify-center items-center p-4">
-          <div className="spinner-border animate-spin" />
+          <div className="spinner-border animate-spin"></div>
+          <p className="ml-2">Loading shipping options...</p>
         </div>
       ) : (
-        cost && (
+        formData.selectedProvince &&
+        formData.selectedCity &&
+        (cost && cost.length > 0 ? (
           <div className="space-y-4">
             <p>Select Shipping Service:</p>
             {cost.map((service) => (
-              <div key={service.service} className="flex items-center space-x-4">
+              <div
+                key={service.service}
+                className="flex items-center space-x-4"
+              >
                 <input
                   type="radio"
                   value={service.service}
@@ -155,12 +188,22 @@ const PlaceOrderForm = ({
                   className="mr-2"
                 />
                 <label className="font-semibold">
-                  {service.service} - {formatIDR(service.cost[0].value)}
+                  {service.description} - {formatIDR(service.cost[0].value)}{" "}
+                  (ETD: {service.cost[0].etd} days)
                 </label>
               </div>
             ))}
           </div>
-        )
+        ) : (
+          <div className="p-4 bg-yellow-100 border border-yellow-400 rounded-md">
+            <p className="text-yellow-600 font-semibold">
+              No available shipping options or cost is zero.
+            </p>
+            <p>
+              Please check the selected province and city for valid services.
+            </p>
+          </div>
+        ))
       )}
     </div>
   );
@@ -169,9 +212,7 @@ const PlaceOrderForm = ({
 const PlaceOrder = () => {
   const { backendUrl, cartItems, token, formatIDR, getCartAmount } =
     useContext(ShopContext);
-
   const [selectedMethod, setSelectedMethod] = useState("cod");
-
   const {
     state,
     dispatch,
@@ -179,6 +220,13 @@ const PlaceOrder = () => {
     handleCityChange,
     handleOrderSubmission,
   } = usePlaceOrder(cartItems, backendUrl, token);
+  const totalWeightGram = cartItems.reduce((total, item) => {
+    const itemWeight =
+      item.variant?.selectedOption?.optionWeight ?? item.productWeight ?? 0;
+    return total + itemWeight * item.quantity;
+  }, 0);
+
+  const totalWeightKg = totalWeightGram / 1000; // Konversi gram ke kg
 
   if (!state) {
     return <div className="flex justify-center items-center">Loading...</div>;
@@ -186,26 +234,22 @@ const PlaceOrder = () => {
 
   const { formData, cities, isLoadingCost, cost, selectedService, provinces } =
     state;
-
   const totalCart = getCartAmount();
   const shippingCost = selectedService?.cost[0]?.value || 0;
   const totalOrder = totalCart + shippingCost;
-
   const onSubmitHandler = async (event) => {
     event.preventDefault();
-  
+
     const orderItems = cartItems.map((item) => {
       let itemPrice = item.productPrice || 0;
-  
+
       if (item.variant && item.variant.selectedOption) {
         const selectedOption = item.variant.selectedOption;
-  
         itemPrice = selectedOption.optionPrice || itemPrice;
       } else if (item.variant) {
         itemPrice = item.variant.variantPrice || 0;
       }
-  
-      // Pastikan kita menyertakan semua data yang diperlukan terkait dengan variant
+
       const variantData = item.variant
         ? {
             variantId: item.variant.variantId,
@@ -215,28 +259,21 @@ const PlaceOrder = () => {
                   optionId: item.variant.selectedOption.optionId,
                   optionName: item.variant.selectedOption.optionName,
                   optionPrice: item.variant.selectedOption.optionPrice,
-                  optionSku: item.variant.selectedOption.optionSku,
-                  optionStock: item.variant.selectedOption.optionStock,
-                  optionWeight: item.variant.selectedOption.optionWeight,
                 }
               : null,
           }
         : null;
-  
+
       return {
         id: item.productId,
         name: item.productName,
         quantity: item.quantity,
         price: itemPrice,
-        productName: item.productName,
-        productDescription: item.productDescription,
-        productCategory: item.productCategory,
-        productSubCategory: item.productSubCategory,
-        productImages: item.productImages,
-        variant: variantData,  // Pastikan data variant dikirim dengan benar
+        variant: variantData,
+        image: item.productImages[0],
       };
     });
-  
+
     const orderData = {
       items: orderItems,
       address: {
@@ -245,18 +282,15 @@ const PlaceOrder = () => {
         lastName: formData.lastName,
         email: formData.email,
         phone: formData.phone,
-        province: formData.selectedProvince || "", // Default to empty if no province
-        city: formData.selectedCity || "", // Default to empty if no city
+        province: formData.selectedProvince || "",
+        city: formData.selectedCity || "",
       },
       amount: totalCart,
       ongkir: shippingCost,
     };
-  
     handleOrderSubmission(selectedMethod, orderData);
   };
-  
 
-  // Fix: Ensuring province change only when needed
   useEffect(() => {
     if (formData.selectedProvince && !cities.length) {
       handleProvinceChange(formData.selectedProvince);
@@ -264,8 +298,11 @@ const PlaceOrder = () => {
   }, [formData.selectedProvince, cities.length, handleProvinceChange]);
 
   return (
-    <form onSubmit={onSubmitHandler} className="p-4 border border-gray-300 rounded-md">
-      <div className="flex space-x-8">
+    <form
+      onSubmit={onSubmitHandler}
+      className="p-6 border rounded-md bg-white shadow-md"
+    >
+      <div className="flex space-x-8 flex-wrap">
         <PlaceOrderForm
           formData={formData}
           dispatch={dispatch}
@@ -278,16 +315,37 @@ const PlaceOrder = () => {
           selectedService={selectedService}
           formatIDR={formatIDR}
         />
-        <div className="flex-1 space-y-4">
-          <CartTotal />
-          <div className="p-4 bg-gray-100 border rounded">
-            <p className="font-semibold">
-              Shipping Cost: {formatIDR(shippingCost)}
-            </p>
-            <p className="font-semibold text-lg">
-              Total Order: {formatIDR(totalOrder)}
-            </p>
+        <div className="flex-1 space-y-6">
+          {/* Subtotal, Shipping Cost, Total Order komponen terpisah */}
+          <div className="p-6 bg-gray-50 dark:bg-gray-800 rounded-lg shadow-md">
+            <h3 className="text-lg font-semibold mb-4">Order Summary</h3>
+            <div className="space-y-4 text-sm">
+              <div className="flex justify-between">
+                <span>SubTotal Pesanan</span>
+                <span>{formatIDR(totalCart)}</span>
+              </div>
+
+              {/* Shipping Cost */}
+              <div className="flex justify-between">
+            
+                <span>Shipping Cost ({totalWeightKg} kg)</span>
+                <span>
+                  {formatIDR(shippingCost)}
+                  <br />
+                  <span className="text-xs text-gray-500"></span>
+                </span>
+              </div>
+
+              <div className="border-t border-gray-300 dark:border-gray-700 pt-2" />
+
+              {/* Total Order */}
+              <div className="flex justify-between text-xl font-semibold">
+                <span>Total Order</span>
+                <span>{formatIDR(totalOrder)}</span>
+              </div>
+            </div>
           </div>
+
           <p>Choose Payment Method:</p>
           <PaymentMethodCOD
             selectedMethod={selectedMethod}
@@ -297,12 +355,6 @@ const PlaceOrder = () => {
             selectedMethod={selectedMethod}
             setSelectedMethod={setSelectedMethod}
           />
-          <button
-            type="submit"
-            className="w-full mt-4 bg-teal-500 text-white py-2 rounded"
-          >
-            Place Order
-          </button>
         </div>
       </div>
     </form>

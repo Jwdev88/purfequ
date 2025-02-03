@@ -12,12 +12,41 @@ import {
   Spinner,
   Stack,
   Text,
+  SimpleGrid,
+  useBreakpointValue,
 } from "@chakra-ui/react";
 import { toast } from "react-toastify";
 import { SearchIcon, AddIcon } from "@chakra-ui/icons";
-import {ProductCard} from "./Productcard";
+import { ProductCard } from "./Productcard";
 import { backendURI } from "../../App";
 import ProductPagination from "../../ProductPagination";
+
+// Helper functions (di luar komponen ProductList)
+function filterAndSearchProducts(products, searchTerm, filterCategory, filterSubCategory) {
+  let filtered = products.filter((product) =>
+    product.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (filterCategory) {
+    filtered = filtered.filter((product) => product.category?._id === filterCategory);
+  }
+
+  if (filterSubCategory) {
+    filtered = filtered.filter((product) => product.subCategory?._id === filterSubCategory);
+  }
+
+  return filtered;
+}
+
+function sortProducts(products, sortPrice) {
+  if (sortPrice === "high") {
+    return [...products].sort((a, b) => b.price - a.price);
+  } else if (sortPrice === "low") {
+    return [...products].sort((a, b) => a.price - b.price);
+  } else {
+    return products;
+  }
+}
 
 const ProductList = ({ token }) => {
   const [products, setProducts] = useState([]);
@@ -32,20 +61,14 @@ const ProductList = ({ token }) => {
   const [productsPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(0);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [productResponse, categoryResponse, subCategoryResponse] =
-        await Promise.all([
-          axios.get(
-            `${backendURI}/api/product/list?page=${currentPage}&limit=${productsPerPage}`,
-            { headers: { token } }
-          ),
-          axios.get(`${backendURI}/api/category/list`, { headers: { token } }),
-          axios.get(`${backendURI}/api/subcategory/list`, {
-            headers: { token },
-          }),
-        ]);
+
+      const productResponse = await axios.get(
+        `${backendURI}/api/product/list?page=${currentPage}&limit=${productsPerPage}`,
+        { headers: { token } }
+      );
 
       if (productResponse.data.success) {
         setProducts(productResponse.data.products);
@@ -54,45 +77,30 @@ const ProductList = ({ token }) => {
         toast.error("Failed to fetch products");
       }
 
+      const categoryResponse = await axios.get(`${backendURI}/api/category/list`, { headers: { token } });
       setCategories(categoryResponse.data.categories);
+
+      const subCategoryResponse = await axios.get(`${backendURI}/api/subcategory/list`, { headers: { token } });
       setSubCategories(subCategoryResponse.data.subCategories);
     } catch (error) {
       toast.error(`Error fetching data: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [token, currentPage, productsPerPage]);
 
   useEffect(() => {
     fetchData();
-  }, [token, currentPage]);
+  }, [fetchData]);
+
+  const numColumns = useBreakpointValue({ base: 1, md: 2, lg: 3 });
 
   const filteredProducts = useMemo(() => {
-    let filtered = products.filter((product) =>
-      product.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    if (filterCategory) {
-      filtered = filtered.filter(
-        (product) => product.category?._id === filterCategory
-      );
-    }
-
-    if (filterSubCategory) {
-      filtered = filtered.filter(
-        (product) => product.subCategory?._id === filterSubCategory
-      );
-    }
-
-    return filtered;
+    return filterAndSearchProducts(products, searchTerm, filterCategory, filterSubCategory);
   }, [products, searchTerm, filterCategory, filterSubCategory]);
 
   const sortedProducts = useMemo(() => {
-    return sortPrice === "high"
-      ? [...filteredProducts].sort((a, b) => b.price - a.price)
-      : sortPrice === "low"
-      ? [...filteredProducts].sort((a, b) => a.price - b.price)
-      : filteredProducts;
+    return sortProducts(filteredProducts, sortPrice);
   }, [filteredProducts, sortPrice]);
 
  const handleDelete = useCallback(

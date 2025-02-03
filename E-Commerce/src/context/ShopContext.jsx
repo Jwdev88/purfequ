@@ -12,6 +12,8 @@ import "react-toastify/dist/ReactToastify.css";
 import { useNavigate } from "react-router-dom";
 import { actionTypes as shopActionTypes } from "./actionTypes";
 import { apiCall } from "../utils/apiCall";
+import { notifySuccess, notifyError,notifyWarningWithAction } from "../components/ToastNotification";
+
 export const ShopContext = createContext();
 
 const initialState = {
@@ -26,8 +28,6 @@ const initialState = {
 };
 
 const reducer = (state, action) => {
-  // console.log("Reducer action type:", action.type);
-  // console.log("Reducer action payload:", action.payload);
   switch (action.type) {
     case shopActionTypes.SET_SEARCH:
       return { ...state, search: action.payload };
@@ -46,7 +46,6 @@ const reducer = (state, action) => {
     case shopActionTypes.SET_TOKEN:
       return { ...state, token: action.payload };
     default:
-      // console.debug("Unhandled action type:", action.type);
       return state;
   }
 };
@@ -77,14 +76,11 @@ const ShopContextProvider = ({ children }) => {
   };
   const fetchData = useCallback(
     async (url, actionType, errorMessage) => {
-      console.log("Sedang mengambil data dari URL:", url);
-      console.log("Tipe Aksi:", actionType);
       dispatch({ type: shopActionTypes.SET_LOADING, payload: true });
 
       try {
         const response = await apiCall(url, "GET", {}, state.token);
         const data = response.data;
-        console.log("Fetched data:", data);
 
         if (data.success) {
           // Gunakan mapping key yang sesuai dengan response API
@@ -95,7 +91,7 @@ const ShopContextProvider = ({ children }) => {
           }[actionType];
 
           if (key && data[key]) {
-            console.log(
+            (
               `Dispatching action ${actionType} with payload:`,
               data[key]
             );
@@ -104,15 +100,13 @@ const ShopContextProvider = ({ children }) => {
               payload: data[key],
             });
           } else {
-            console.error(`Key "${key}" tidak ditemukan dalam response API.`);
-            toast.error(errorMessage);
+            notifyError(errorMessage);
           }
         } else {
           throw new Error(data.message || errorMessage);
         }
       } catch (error) {
-        console.error("Error fetching data:", error);
-        toast.error(error.message || errorMessage);
+        notifyError(error.message || errorMessage);
       } finally {
         dispatch({ type: shopActionTypes.SET_LOADING, payload: false });
       }
@@ -122,7 +116,6 @@ const ShopContextProvider = ({ children }) => {
 
   useEffect(() => {
     const fetchInitialData = async () => {
-      console.log("Fetching initial data...");
       await Promise.all([
         fetchData(
           `${backendUrl}/api/category/list`,
@@ -140,21 +133,18 @@ const ShopContextProvider = ({ children }) => {
           "Gagal mengambil data produk."
         ),
       ]);
-      console.log("Initial data fetched.");
     };
     fetchInitialData();
   }, [backendUrl, fetchData]);
 
   const getUserCart = useCallback(async () => {
     try {
-      console.log("Fetching user cart...");
       const response = await apiCall(
         `${backendUrl}/api/cart/get`,
         "GET",
         {},
         state.token
       );
-      console.log("User cart response:", response.data);
       if (response.data.success) {
         dispatch({
           type: shopActionTypes.SET_CART_ITEMS,
@@ -164,8 +154,7 @@ const ShopContextProvider = ({ children }) => {
         throw new Error("Gagal mengambil data keranjang.");
       }
     } catch (error) {
-      console.error("Error fetching user cart:", error);
-      toast.error(error.message || "Kesalahan saat mengambil data keranjang.");
+      notifyError(error.message || "Kesalahan saat mengambil data keranjang.");
     }
   }, [backendUrl, state.token]);
 
@@ -176,7 +165,7 @@ const ShopContextProvider = ({ children }) => {
   const addToCart = useCallback(
     async (productId, variantId, optionId, quantity) => {
       if (!productId || quantity < 1) {
-        toast.error("Data tidak valid untuk menambahkan ke keranjang.");
+        notifyError("Data tidak valid untuk menambahkan ke keranjang.");
         return;
       }
       try {
@@ -187,17 +176,14 @@ const ShopContextProvider = ({ children }) => {
           state.token
         );
 
-        console.log("API response:", response.data); // Debugging log
 
         if (response.data.success) {
-          console.log("API cartData:", response.data.cartData); // Debugging log
-
           dispatch({
             type: shopActionTypes.SET_CART_ITEMS,
             payload: response.data.cartData || [], // Ensure payload is always an array
           });
 
-          toast.success("Produk berhasil ditambahkan ke keranjang.");
+          notifySuccess("Produk berhasil ditambahkan ke keranjang.");
           return response.data.cartData;
         } else {
           throw new Error(
@@ -205,7 +191,7 @@ const ShopContextProvider = ({ children }) => {
           );
         }
       } catch (error) {
-        toast.error(
+        notifyError(
           error.message || "Kesalahan saat menambahkan item ke keranjang."
         );
         throw error;
@@ -217,7 +203,7 @@ const ShopContextProvider = ({ children }) => {
   const updateQuantity = useCallback(
     async (productId, variantId, optionId, quantity) => {
       if (!productId || quantity < 1) {
-        toast.error("Data tidak valid untuk memperbarui kuantitas.");
+        notifyError("Data tidak valid untuk memperbarui kuantitas.");
         return;
       }
       try {
@@ -241,7 +227,7 @@ const ShopContextProvider = ({ children }) => {
           );
         }
       } catch (error) {
-        toast.error(
+        notifyError(
           error.message || "Kesalahan saat memperbarui kuantitas keranjang."
         );
         throw error;
@@ -270,7 +256,7 @@ const ShopContextProvider = ({ children }) => {
           );
         }
       } catch (error) {
-        toast.error(
+        notifyError(
           error.message || "Kesalahan saat menghapus item dari keranjang."
         );
       }
@@ -292,7 +278,7 @@ const ShopContextProvider = ({ children }) => {
         throw new Error("Gagal mengosongkan keranjang.");
       }
     } catch (error) {
-      toast.error(error.message || "Gagal mengosongkan keranjang.");
+      notifyError(error.message || "Gagal mengosongkan keranjang.");
     }
   }, [backendUrl, state.token]);
 
@@ -327,7 +313,7 @@ const ShopContextProvider = ({ children }) => {
     backendUrl,
     dispatch,
   };
-  console.log("Shop Context State:", state);
+ 
 
   return <ShopContext.Provider value={value}>{children}</ShopContext.Provider>;
 };

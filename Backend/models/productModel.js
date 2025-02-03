@@ -18,7 +18,7 @@ const variantOptionSchema = new mongoose.Schema({
 });
 
 const VariantOption = mongoose.models.VariantOption || mongoose.model("VariantOption", variantOptionSchema);
-// Variant schema
+// Variant schema 
 const variantSchema = new mongoose.Schema({
   name: { type: String, required: true },
   options: [variantOptionSchema], // Array of variant options

@@ -6,6 +6,7 @@ import mongoose from 'mongoose'
     items: { type: Array, required: true },
     amount: { type: Number, required: true },
     address: { type: Object, required: true },
+    ongkir: { type: Number, required: true }, // Pastikan ini ada
     status: { type: String, required: true, default: 'pending' }, // Set default "pending"
     paymentMethod: { type: String, required: true },
     payment: { type: Boolean, required: true, default: false },

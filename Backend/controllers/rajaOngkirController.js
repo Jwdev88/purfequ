@@ -95,7 +95,7 @@ const rajaOngkirController = {
         console.log('Menggunakan data biaya pengiriman dari cache.');
         return res.json(cachedCost);
       }
-
+      console.error("weight:",weight);
       const response = await axios.post('https://api.rajaongkir.com/starter/cost', {
         origin: origin,
         destination: destination,

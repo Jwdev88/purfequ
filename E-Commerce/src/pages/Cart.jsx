@@ -108,7 +108,7 @@ const CartItem = React.memo(({ item, formatIDR, handleQuantityChange, handleRemo
         <p className="text-lg font-semibold">{item.productName}</p>
         <p className="text-sm text-gray-600">{item.variantName} - {item.optionName}</p>
         <p className="text-sm text-gray-600">
-          Category: {item.productCategory} <br />
+          Category: {item.productCategory} <br/>
           Subcategory: {item.productSubCategory}
         </p>
         <p className="text-lg font-bold">{formatIDR(item.optionPrice)}</p>
