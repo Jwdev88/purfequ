@@ -1,7 +1,8 @@
-import React, { useContext, useReducer, useEffect } from 'react';
+import React, { useContext, useReducer, useCallback } from 'react';
 import { assets } from '../assets/assets';
 import { NavLink, Link } from 'react-router-dom';
 import { ShopContext } from '../context/ShopContext';
+import { actionTypes } from "../context/actionTypes";
 
 const initialState = { visible: false };
 
@@ -16,14 +17,16 @@ const reducer = (state, action) => {
 
 const Navbar = () => {
   const [state, dispatch] = useReducer(reducer, initialState);
-  const { toggleShowSearch, navigate, token, setToken, getCountCart } = useContext(ShopContext);
+  const { toggleShowSearch, navigate, token, setToken, getCountCart,dispatch: globalDispatch } = useContext(ShopContext);
 
-  const logout = () => {
+  const logout = useCallback(() => {
+    globalDispatch({ type: actionTypes.CLEAR_CART }); // Pastikan CLEAR_CART ada
+
     navigate('/login');
     localStorage.removeItem('token');
     localStorage.removeItem('userId');
     setToken('');
-  };
+  }, [navigate, setToken, globalDispatch]);
 
   return (
     <div className="flex items-center justify-between py-5 font-medium">

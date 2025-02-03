@@ -1,6 +1,6 @@
 import { model } from "mongoose";
 import orderModel from "../models/ordermodel.js";
-import userModel from "../models/userModel.js";
+import UserModel from "../models/userModel.js"
 import midtransClient from "midtrans-client";
 import { v4 as uuidv4 } from "uuid";
 
@@ -53,7 +53,6 @@ const placeOrder = async (req, res) => {
   try {
     const { items, amount, address, ongkir } = req.body;
     const userId = req.user._id || req.params.userId || req.query.userId;
-    console.log("req body:", items, ongkir);
 
     if (!userId) return res.status(400).json({ message: "Missing userId" });
     if (!items || !Array.isArray(items) || items.length === 0)
@@ -66,8 +65,10 @@ const placeOrder = async (req, res) => {
     await createOrder(userId, items, amount, address, "COD", ongkir);
 
     // Clear the user's cart data
-    await userModel.findByIdAndUpdate(userId, { cartData: {} });
 
+    await UserModel.findByIdAndUpdate(userId, { cartData: [] });
+    
+    
     res.json({ success: true, message: "Order Placed", paymentMethod: "COD" });
   } catch (error) {
     console.error(error);
@@ -144,6 +145,9 @@ const placeOrderMidtrans = async (req, res) => {
     newOrder.status = "pending";
     await newOrder.save();
 
+    await UserModel.findByIdAndUpdate(userId, { cartData: [] });
+    console.log("cartdata:",UserModel);
+
     res.status(201).json({
       success: true,
       message: "Order Placed",
@@ -182,7 +186,7 @@ const userOrders = async (req, res) => {
 
     const userId = req.user._id; // Mendapatkan userId dari data pengguna yang sudah terautentikasi
     const orders = await orderModel.find({ userId });
-
+    
     // Cek apakah pesanan ditemukan
     if (!orders || orders.length === 0) {
       return res

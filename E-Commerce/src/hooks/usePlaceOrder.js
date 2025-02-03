@@ -1,8 +1,9 @@
-import { useReducer, useCallback, useEffect, useMemo } from "react";
+import { useReducer, useCallback, useEffect, useMemo,useContext } from "react";
 import { notifySuccess, notifyError,notifyWarningWithAction } from "../components/ToastNotification";
 import { useNavigate } from "react-router-dom";
 import { actionTypes } from "../context/actionTypes";
 import { apiCall } from "../utils/apiCall";
+import { ShopContext } from "../context/ShopContext";
 
 const initialState = {
   selectedProvince: "",
@@ -57,6 +58,7 @@ const reducer = (state, action) => {
 
 const usePlaceOrder = (cartItems, backendUrl, token) => {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const { dispatch: globalDispatch } = useContext(ShopContext);
   const navigate = useNavigate();
   const citiesCache = useMemo(() => new Map(), []); // Cache to store cities by province
   // Fetch provinces on component mount
@@ -170,13 +172,11 @@ const calculateShippingCost = useCallback(async () => {
   // Handle order submission (COD or Midtrans)
   const handleOrderSubmission = async (paymentMethod, orderData) => {
     try {
-      // Validate address, province, and city
       if (!state.formData.address || !state.selectedProvince || !state.selectedCity) {
         notifyError("Please provide a complete address (address, province, and city).");
         return;
       }
-
-      // Ensure cart is not empty and service is selected
+  
       if (!cartItems.length) {
         notifyError("Your cart is empty");
         return;
@@ -185,36 +185,16 @@ const calculateShippingCost = useCallback(async () => {
         notifyError("Please select a shipping service");
         return;
       }
-
+  
       let response;
       if (paymentMethod === "midtrans") {
-        response = await apiCall(
-          `${backendUrl}/api/order/midtrans`,
-          "POST",
-          orderData,
-          token
-        );
+        response = await apiCall(`${backendUrl}/api/order/midtrans`, "POST", orderData, token);
       } else if (paymentMethod === "cod") {
-        response = await apiCall(
-          `${backendUrl}/api/order/place`, // Ensure a COD endpoint is set up in the backend
-          "POST",
-          orderData,
-          token
-        );
+        response = await apiCall(`${backendUrl}/api/order/place`, "POST", orderData, token);
       }
-
-      // Handle backend response
-      if (response && response.data.token) {
-        // Redirect to Midtrans payment page
-        window.snap.pay(response.data.token, {
-          onSuccess: () => {
-            navigate("/orders");
-            notifySuccess("Order placed successfully!");
-          },
-          onError: () => notifyError("Payment failed"),
-        });
-      } else if (response && response.data.success) {
-        // Redirect to orders page for COD or other successful methods
+  
+      if (response && response.data.success) {
+        globalDispatch({ type: actionTypes.CLEAR_CART }); // Kosongkan cart di context
         navigate("/orders");
         notifySuccess("Order placed successfully!");
       } else {
