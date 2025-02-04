@@ -221,18 +221,23 @@ const handleNotification = async (req, res) => {
   try {
     const notification = req.body;
 
+    console.log("🔔 Notification received:", notification); // Log notifikasi yang diterima
+
     // Validasi data yang diterima dari Midtrans
     if (
       !notification.order_id ||
       !notification.transaction_status ||
       !notification.fraud_status
     ) {
+      console.error("Invalid notification data");
       return res.status(400).send("Invalid notification data");
     }
 
     const orderId = notification.order_id;
     const transactionStatus = notification.transaction_status;
     const fraudStatus = notification.fraud_status;
+
+    console.log(`Order ID: ${orderId}, Transaction Status: ${transactionStatus}, Fraud Status: ${fraudStatus}`);
 
     // Tentukan status pembayaran berdasarkan transaction_status
     let newStatus = "pending"; // Default status adalah pending
@@ -246,22 +251,27 @@ const handleNotification = async (req, res) => {
       newStatus = "failed"; // Pembayaran gagal
     }
 
+    console.log(`New status to be updated: ${newStatus}`);
+
     // Update status order di MongoDB
     const updatedOrder = await orderModel.findOneAndUpdate(
-      { transactionToken: orderId }, // Sesuaikan dengan field yang ada di database
+      { transactionToken: orderId }, // Cari order berdasarkan transactionToken
       { payment: newStatus === "paid", status: newStatus }, // Update status pembayaran
-      { new: true } // Mendapatkan data yang telah diupdate
+      { new: true } // Mengembalikan data yang telah diupdate
     );
 
     // Jika order tidak ditemukan, berikan response 404
     if (!updatedOrder) {
+      console.error(`Order not found for order ID: ${orderId}`);
       return res.status(404).send("Order not found");
     }
+
+    console.log("✅ Order updated successfully:", updatedOrder);
 
     // Berikan respon yang lengkap
     res.status(200).json({ success: true, message: "OK" });
   } catch (error) {
-    console.error("Error handling notification:", error);
+    console.error("❌ Error handling notification:", error);
     res.status(500).send("Internal Server Error");
   }
 };
