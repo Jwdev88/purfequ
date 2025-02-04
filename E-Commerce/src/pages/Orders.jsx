@@ -62,7 +62,7 @@ const Orders = () => {
             <div key={order._id} className="bg-white shadow-md rounded-lg p-6 mb-6">
               <h2 className="text-2xl font-semibold">ID Order: {order._id}</h2>
               <div className="mt-2 text-gray-700">
-                <p>Status: <span className="font-semibold">{order.status === "pending" ? "Menunggu Pembayaran" : order.status}</span></p>
+                <p>Status: <span className="font-semibold">{order.status}</span></p>
                 <p>Metode Pembayaran: {order.paymentMethod}</p>
                 <p className="text-gray-700">Subtotal: {formatIDR(calculateTotal(order.items, 0))}</p>
                 <p>Biaya Pengiriman: {formatIDR(order.ongkir)}</p>
