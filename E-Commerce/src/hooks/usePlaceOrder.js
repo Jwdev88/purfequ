@@ -1,10 +1,10 @@
+
 import { useReducer, useCallback, useEffect, useMemo,useContext } from "react";
 import { notifySuccess, notifyError,notifyWarningWithAction } from "../components/ToastNotification";
 import { useNavigate } from "react-router-dom";
 import { actionTypes } from "../context/actionTypes";
 import { apiCall } from "../utils/apiCall";
 import { ShopContext } from "../context/ShopContext";
-
 const initialState = {
   selectedProvince: "",
   selectedCity: "",
@@ -58,9 +58,9 @@ const reducer = (state, action) => {
 
 const usePlaceOrder = (cartItems, backendUrl, token) => {
   const [state, dispatch] = useReducer(reducer, initialState);
-  const { dispatch: globalDispatch } = useContext(ShopContext);
   const navigate = useNavigate();
   const citiesCache = useMemo(() => new Map(), []); // Cache to store cities by province
+  const { dispatch: globalDispatch } = useContext(ShopContext);
   // Fetch provinces on component mount
   useEffect(() => {
     const fetchProvinces = async () => {
@@ -172,6 +172,7 @@ const calculateShippingCost = useCallback(async () => {
   // Handle order submission (COD or Midtrans)
   const handleOrderSubmission = async (paymentMethod, orderData) => {
     try {
+      // 🔹 Validasi alamat, cart, dan layanan pengiriman
       if (!state.formData.address || !state.selectedProvince || !state.selectedCity) {
         notifyError("Please provide a complete address (address, province, and city).");
         return;
@@ -181,29 +182,64 @@ const calculateShippingCost = useCallback(async () => {
         notifyError("Your cart is empty");
         return;
       }
+  
       if (!state.selectedService) {
         notifyError("Please select a shipping service");
         return;
       }
   
       let response;
+      
       if (paymentMethod === "midtrans") {
         response = await apiCall(`${backendUrl}/api/order/midtrans`, "POST", orderData, token);
       } else if (paymentMethod === "cod") {
         response = await apiCall(`${backendUrl}/api/order/place`, "POST", orderData, token);
       }
   
-      if (response && response.data.success) {
-        globalDispatch({ type: actionTypes.CLEAR_CART }); // Kosongkan cart di context
-        navigate("/orders");
+      if (!response) {
+        notifyError("Failed to process your order. Please try again.");
+        return;
+      }
+  
+      if (paymentMethod === "midtrans") {
+        const orderId = response.data.orderId;
+      
+        if (!orderId) {
+          notifyError("Order ID is missing. Please try again.");
+          return;
+        }
+      
+        window.snap.pay(response.data.token, {
+          onSuccess: async () => {
+            notifySuccess("Payment successful!");
+            globalDispatch({ type: actionTypes.CLEAR_CART });
+            navigate("/orders");
+          },
+          onPending: () => {
+            notifyWarningWithAction(
+              "Your payment is pending. Please complete the payment via Midtrans.",
+              "Check Status",
+              () => navigate("/orders")
+            );
+          },
+          onError: () => {
+            notifyError("Payment failed. Please try again.");
+          }
+        });
+      }
+       else if (paymentMethod === "cod" && response.data.success) {
+        // 🔹 COD sukses, kosongkan cart
+        globalDispatch({ type: actionTypes.CLEAR_CART });
         notifySuccess("Order placed successfully!");
+        navigate("/orders");
       } else {
         notifyError("Failed to process your order. Please try again.");
       }
     } catch (error) {
-      notifyError("Failed to place your order. Please try again.");
+      notifyError("An error occurred while processing your order. Please try again.");
     }
   };
+  
 
   return {
     state,

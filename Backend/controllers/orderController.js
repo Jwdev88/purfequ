@@ -1,6 +1,6 @@
 import { model } from "mongoose";
 import orderModel from "../models/ordermodel.js";
-import UserModel from "../models/userModel.js"
+import UserModel from "../models/userModel.js";
 import midtransClient from "midtrans-client";
 import { v4 as uuidv4 } from "uuid";
 
@@ -67,8 +67,7 @@ const placeOrder = async (req, res) => {
     // Clear the user's cart data
 
     await UserModel.findByIdAndUpdate(userId, { cartData: [] });
-    
-    
+
     res.json({ success: true, message: "Order Placed", paymentMethod: "COD" });
   } catch (error) {
     console.error(error);
@@ -146,7 +145,7 @@ const placeOrderMidtrans = async (req, res) => {
     await newOrder.save();
 
     await UserModel.findByIdAndUpdate(userId, { cartData: [] });
-    console.log("cartdata:",UserModel);
+    console.log("cartdata:", UserModel);
 
     res.status(201).json({
       success: true,
@@ -186,7 +185,7 @@ const userOrders = async (req, res) => {
 
     const userId = req.user._id; // Mendapatkan userId dari data pengguna yang sudah terautentikasi
     const orders = await orderModel.find({ userId });
-    
+
     // Cek apakah pesanan ditemukan
     if (!orders || orders.length === 0) {
       return res
@@ -312,6 +311,7 @@ const handleFailure = async (req, res) => {
       .json({ success: false, message: "Failed to process payment" });
   }
 };
+
 
 export {
   placeOrder,
