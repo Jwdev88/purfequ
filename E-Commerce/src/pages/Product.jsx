@@ -98,7 +98,7 @@ const Product = () => {
             }else if (minPrice === 0) {
                 priceToDisplay = ''; // Or "0", or any other custom message
             }  else if (minPrice !== null){
-                priceToDisplay = `From ${formatIDR(minPrice)}`; // Format *before* adding "From"
+                priceToDisplay = ``; // Format *before* adding "From"
             }
         }
 
