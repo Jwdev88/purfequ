@@ -1,104 +1,139 @@
-import React, { useContext, useReducer, useCallback } from 'react';
-import { assets } from '../assets/assets';
-import { NavLink, Link } from 'react-router-dom';
+import React, { useContext, useReducer, useCallback, useRef, useEffect } from 'react';
+import { assets } from '../assets/assets'; // Make sure the path is correct
+import { NavLink, Link, useLocation } from 'react-router-dom';
 import { ShopContext } from '../context/ShopContext';
 import { actionTypes } from "../context/actionTypes";
+import { Menu, X, Search, User, ShoppingCart } from 'lucide-react';
 
 const initialState = { visible: false };
 
 const reducer = (state, action) => {
-  switch (action.type) {
-    case 'TOGGLE_VISIBILITY':
-      return { ...state, visible: !state.visible };
-    default:
-      return state;
-  }
+    switch (action.type) {
+        case 'TOGGLE_VISIBILITY':
+            return { ...state, visible: !state.visible };
+        default:
+            return state;
+    }
 };
 
 const Navbar = () => {
-  const [state, dispatch] = useReducer(reducer, initialState);
-  const { toggleShowSearch, navigate, token, setToken, getCountCart,dispatch: globalDispatch } = useContext(ShopContext);
+    const [state, dispatch] = useReducer(reducer, initialState);
+    const { toggleShowSearch, navigate, token, setToken, getCountCart, dispatch: globalDispatch, setSearch } = useContext(ShopContext); // Added setSearch
+    const location = useLocation();
+    const sidebarRef = useRef(null);
 
-  const logout = useCallback(() => {
-    globalDispatch({ type: actionTypes.CLEAR_CART }); // Pastikan CLEAR_CART ada
+    const logout = useCallback(() => {
+        globalDispatch({ type: actionTypes.CLEAR_CART });
+        navigate('/login');
+        localStorage.removeItem('token');
+        localStorage.removeItem('userId');
+        setToken('');
+    }, [navigate, setToken, globalDispatch]);
 
-    navigate('/login');
-    localStorage.removeItem('token');
-    localStorage.removeItem('userId');
-    setToken('');
-  }, [navigate, setToken, globalDispatch]);
+    const toggleSidebar = () => {
+        dispatch({ type: 'TOGGLE_VISIBILITY' });
+    };
 
-  return (
-    <div className="flex items-center justify-between py-5 font-medium">
-      <Link to="/">
-        <img src={assets.logo2} className="w-36" alt="Logo" />
-      </Link>
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (sidebarRef.current && !sidebarRef.current.contains(event.target) && state.visible) {
+                dispatch({ type: 'TOGGLE_VISIBILITY' });
+            }
+        };
 
-      <ul className="hidden sm:flex gap-5 text-sm text-gray-700">
-        <NavLink to="/" className="flex flex-col items-center gap-1">
-          <p>Home</p>
-          <hr className="w-2/4 border-none h-[1.5px] bg-gray-700 hidden" />
-        </NavLink>
-        <NavLink to="/collection" className="flex flex-col items-center gap-1">
-          <p>Collection</p>
-          <hr className="w-2/4 border-none h-[1.5px] bg-gray-700 hidden" />
-        </NavLink>
-        <NavLink to="/about" className="flex flex-col items-center gap-1">
-          <p>About</p>
-          <hr className="w-2/4 border-none h-[1.5px] bg-gray-700 hidden" />
-        </NavLink>
-        <NavLink to="/contact" className="flex flex-col items-center gap-1">
-          <p>Contact</p>
-          <hr className="w-2/4 border-none h-[1.5px] bg-gray-700 hidden" />
-        </NavLink>
-      </ul>
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [state.visible]);
 
-      <div className="flex items-center gap-6">
-        <img onClick={() => toggleShowSearch(true)} src={assets.search_icon} className="w-5 cursor-pointer" alt="Search" />
+    return (
+        <nav className="bg-white shadow-sm sticky top-0 z-50">
+            <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+                <Link to="/">
+                    <img src={assets.logo2} className="h-8 md:h-10" alt="Logo" />
+                </Link>
 
-        <div className="group relative">
-          <img onClick={() => token ? null : navigate('/login')} className="w-5 cursor-pointer" src={assets.profile_icon} alt="Profile" />
-          {token &&
-            <div className="group-hover:block hidden absolute dropdown-menu right-0 pt-4">
-              <div className="flex flex-col gap-2 w-36 py-3 px-5 bg-slate-100 text-gray-500 rounded">
-                <p className="cursor-pointer hover:text-black">My Profile</p>
-                <p onClick={() => navigate('/orders')} className="cursor-pointer hover:text-black">Orders</p>
-                <p onClick={logout} className="cursor-pointer hover:text-black">Logout</p>
-              </div>
-            </div>}
-        </div>
+                <ul className="hidden md:flex gap-8 text-gray-700">
+                    <NavLink to="/" className={({ isActive }) => `flex items-center gap-1 ${isActive ? 'text-black font-semibold' : 'hover:text-gray-900'} transition-colors`}>
+                        <span>Home</span>
+                    </NavLink>
+                    <NavLink to="/collection" className={({ isActive }) => `flex items-center gap-1 ${isActive ? 'text-black font-semibold' : 'hover:text-gray-900'} transition-colors`}>
+                        <span>Collection</span>
+                    </NavLink>
+                    <NavLink to="/about" className={({ isActive }) => `flex items-center gap-1 ${isActive ? 'text-black font-semibold' : 'hover:text-gray-900'} transition-colors`}>
+                        <span>About</span>
+                    </NavLink>
+                    <NavLink to="/contact" className={({ isActive }) => `flex items-center gap-1 ${isActive ? 'text-black font-semibold' : 'hover:text-gray-900'} transition-colors`}>
+                        <span>Contact</span>
+                    </NavLink>
+                </ul>
 
-        <Link to="/cart" className="relative">
-          <img src={assets.cart_icon} className="w-5 min-w-5" alt="Cart" />
-          <p className="absolute right-[-5px] bottom-[-5px] w-4 text-center leading-4 bg-black text-white aspect-square rounded-full text-[8px]">
-            {getCountCart()}
-          </p>
-        </Link>
-      </div>
+                <div className="flex items-center gap-4">
+                    {/* Search Icon (Opens Search Bar - Handled in ShopContext) */}
+                    <button
+                        onClick={() => toggleShowSearch(true)}
+                        aria-label="Search"
+                        className="hover:text-gray-900 transition-colors"
+                    >
+                        <Search className="w-5 h-5" />
+                    </button>
 
-      {/* Sidebar menu for small screens */}
-      <div className={`absolute top-0 right-0 bottom-0 overflow-hidden bg-white transition-all ${state.visible ? 'w-full' : 'w-0'}`}>
-        <div className="flex flex-col text-gray-600">
-          <div onClick={() => dispatch({ type: 'TOGGLE_VISIBILITY' })} className="flex items-center gap-4 p-3 cursor-pointer">
-            <img src={assets.dropdown_icon} className="h-4 rotate-180" alt="Back" />
-            <p>Back</p>
-          </div>
-          <NavLink onClick={() => dispatch({ type: 'TOGGLE_VISIBILITY' })} className="py-2 pl-6 border" to="/">
-            Home
-          </NavLink>
-          <NavLink onClick={() => dispatch({ type: 'TOGGLE_VISIBILITY' })} className="py-2 pl-6 border" to="/collection">
-            Collection
-          </NavLink>
-          <NavLink onClick={() => dispatch({ type: 'TOGGLE_VISIBILITY' })} className="py-2 pl-6 border" to="/about">
-            About
-          </NavLink>
-          <NavLink onClick={() => dispatch({ type: 'TOGGLE_VISIBILITY' })} className="py-2 pl-6 border" to="/contact">
-            Contact
-          </NavLink>
-        </div>
-      </div>
-    </div>
-  );
+                    <div className="relative group">
+                        <button onClick={() => token ? null : navigate('/login')} aria-label="Profile" className="hover:text-gray-900 transition-colors">
+                            <User className="w-5 h-5" /> {/* Consistent Icon */}
+                        </button>
+                        {token && (
+                            <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg py-2 z-10 hidden group-hover:block">
+                                <Link to="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">My Profile</Link>
+                                <Link to="/orders" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Orders</Link>
+                                <button onClick={logout} className="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100 w-full text-left">Logout</button>
+                            </div>
+                        )}
+                    </div>
+
+                    <Link to="/cart" className="relative hover:text-gray-900 transition-colors" aria-label="Cart">
+                        <ShoppingCart className="w-5 h-5" /> {/* Consistent Icon */}
+                        <span className="absolute right-[-8px] top-[-8px] w-4 h-4 bg-blue-600 text-white rounded-full text-[10px] flex items-center justify-center">
+                            {getCountCart()}
+                        </span>
+                    </Link>
+
+                    {/* Hamburger Menu Button */}
+                    <button onClick={toggleSidebar} className="md:hidden" aria-label="Open Menu">
+                        <Menu className="h-6 w-6 text-gray-700" />
+                    </button>
+                </div>
+
+                {/* Sidebar Menu */}
+                <div
+                    ref={sidebarRef}
+                    className={`fixed top-0 right-0 bottom-0 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out ${state.visible ? 'translate-x-0' : 'translate-x-full'} md:hidden z-40`}
+                >
+                    <div className="flex items-center justify-between p-4 border-b">
+                        <span className="text-lg font-semibold">Menu</span>
+                        <button onClick={toggleSidebar} aria-label="Close Menu">
+                            <X className="h-6 w-6 text-gray-700" />
+                        </button>
+                    </div>
+                    <div className="flex flex-col text-gray-600">
+                        <NavLink onClick={toggleSidebar} className="py-3 pl-6 border-b hover:bg-gray-50" to="/">Home</NavLink>
+                        <NavLink onClick={toggleSidebar} className="py-3 pl-6 border-b hover:bg-gray-50" to="/collection">Collection</NavLink>
+                        <NavLink onClick={toggleSidebar} className="py-3 pl-6 border-b hover:bg-gray-50" to="/about">About</NavLink>
+                        <NavLink onClick={toggleSidebar} className="py-3 pl-6 border-b hover:bg-gray-50" to="/contact">Contact</NavLink>
+                    </div>
+                </div>
+                {/* Overlay to close sidebar */}
+                {state.visible && (
+                    <div
+                        className="fixed inset-0 bg-black opacity-50 z-30 md:hidden"
+                        onClick={toggleSidebar}
+                        aria-label="Close Menu"
+                    ></div>
+                )}
+            </div>
+        </nav>
+    );
 };
 
 export default Navbar;

@@ -1,18 +1,12 @@
 //ShopContext.jsx
-
-import React, {
-  createContext,
-  useEffect,
-  useReducer,
-  useCallback,
-} from "react";
+import React, { createContext, useEffect, useReducer, useCallback } from "react";
 import { FormatRupiah } from "@arismun/format-rupiah";
-import { toast } from "react-toastify";
+import { toast } from "react-toastify"; // Keep, but we'll manage notifications locally
 import "react-toastify/dist/ReactToastify.css";
 import { useNavigate } from "react-router-dom";
 import { actionTypes as shopActionTypes } from "./actionTypes";
 import { apiCall } from "../utils/apiCall";
-import { notifySuccess, notifyError,notifyWarningWithAction } from "../components/ToastNotification";
+// Removed notifySuccess, notifyError, notifyWarningWithAction (for local handling)
 
 export const ShopContext = createContext();
 
@@ -42,7 +36,7 @@ const reducer = (state, action) => {
     case shopActionTypes.SET_CART_ITEMS:
       return { ...state, cartItems: action.payload || [] };
     case shopActionTypes.SET_LOADING:
-      return { ...state, isLoading: action.payload };   
+      return { ...state, isLoading: action.payload };
     case shopActionTypes.SET_TOKEN:
       return { ...state, token: action.payload };
     default:
@@ -50,69 +44,108 @@ const reducer = (state, action) => {
   }
 };
 
-
-
 const ShopContextProvider = ({ children }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
   const navigate = useNavigate();
+
+  // Helper function for consistent notifications
+  const notify = (type, message) => {
+    toast[type](message, {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+    });
+  };
+
+
   const formatIDR = useCallback(
     (amount) => (
       <FormatRupiah value={amount} decimalSeparator="," thousandSeparator="." />
     ),
     []
   );
+
   const setToken = useCallback((token) => {
     localStorage.setItem("token", token);
     dispatch({ type: shopActionTypes.SET_TOKEN, payload: token });
-  }, []); const setSearch = (search) => {
+  }, []);
+
+  const setSearch = (search) => {
     dispatch({ type: shopActionTypes.SET_SEARCH, payload: search });
   };
+
   const toggleShowSearch = (visible) => {
     if (!visible) {
-      dispatch({ type: shopActionTypes.SET_SEARCH, payload: "" }); // Reset search saat SearchBar ditutup
+      dispatch({ type: shopActionTypes.SET_SEARCH, payload: "" }); // Reset search
     }
     dispatch({ type: shopActionTypes.TOGGLE_SHOW_SEARCH, payload: visible });
   };
-  const fetchData = useCallback(
-    async (url, actionType, errorMessage) => {
-      dispatch({ type: shopActionTypes.SET_LOADING, payload: true });
 
-      try {
-        const response = await apiCall(url, "GET", {}, state.token);
-        const data = response.data;
+  // --- MODIFIED fetchData FUNCTION ---
+    const fetchData = useCallback(
+        async (url, actionType, errorMessage) => {
+        dispatch({ type: shopActionTypes.SET_LOADING, payload: true });
 
-        if (data.success) {
-          // Gunakan mapping key yang sesuai dengan response API
-          const key = {
-            SET_CATEGORIES: "categories",
-            SET_SUBCATEGORIES: "subCategories",
-            SET_PRODUCTS: "products",
-          }[actionType];
+        try {
+            const response = await apiCall(url, "GET", {}, state.token);
+            const data = response.data;
 
-          if (key && data[key]) {
-            (
-              `Dispatching action ${actionType} with payload:`,
-              data[key]
-            );
-            dispatch({
-              type: actionType,
-              payload: data[key],
-            });
-          } else {
-            notifyError(errorMessage);
-          }
-        } else {
-          throw new Error(data.message || errorMessage);
+            if (data.success) {
+            let payload = null;
+
+            switch (actionType) {
+                case shopActionTypes.SET_CATEGORIES:
+                payload = data.categories || [];
+                break;
+
+                case shopActionTypes.SET_SUBCATEGORIES:
+                payload = (data.subCategories || []).map((subCat) => ({
+                    ...subCat,
+                    category:
+                    typeof subCat.category === "object" && subCat.category !== null
+                        ? subCat.category._id
+                        : subCat.category,
+                }));
+                break;
+
+                case shopActionTypes.SET_PRODUCTS:
+                    // *** DATA TRANSFORMATION FOR PRODUCTS ***
+                    payload = (data.products || []).map((product) => ({
+                        ...product,
+                        category:
+                        typeof product.category === "object" && product.category !== null
+                            ? product.category._id
+                            : product.category,
+                        subCategory:
+                        typeof product.subCategory === "object" && product.subCategory !== null
+                            ? product.subCategory._id
+                            : product.subCategory,
+                    }));
+                    break;
+            }
+
+            if (payload !== null) {
+                dispatch({ type: actionType, payload });
+            } else {
+                notify('error', errorMessage);
+            }
+            } else {
+            throw new Error(data.message || errorMessage);
+            }
+        } catch (error) {
+            notify('error', error.message || errorMessage);
+        } finally {
+            dispatch({ type: shopActionTypes.SET_LOADING, payload: false });
         }
-      } catch (error) {
-        notifyError(error.message || errorMessage);
-      } finally {
-        dispatch({ type: shopActionTypes.SET_LOADING, payload: false });
-      }
-    },
-    [state.token]
-  );
+        },
+        [state.token]
+    );
+
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -154,7 +187,7 @@ const ShopContextProvider = ({ children }) => {
         throw new Error("Gagal mengambil data keranjang.");
       }
     } catch (error) {
-      notifyError(error.message || "Kesalahan saat mengambil data keranjang.");
+        notify('error', error.message || "Kesalahan saat mengambil data keranjang.");
     }
   }, [backendUrl, state.token]);
 
@@ -165,7 +198,7 @@ const ShopContextProvider = ({ children }) => {
   const addToCart = useCallback(
     async (productId, variantId, optionId, quantity) => {
       if (!productId || quantity < 1) {
-        notifyError("Data tidak valid untuk menambahkan ke keranjang.");
+          notify('error', "Data tidak valid untuk menambahkan ke keranjang.");
         return;
       }
       try {
@@ -176,14 +209,12 @@ const ShopContextProvider = ({ children }) => {
           state.token
         );
 
-
         if (response.data.success) {
           dispatch({
             type: shopActionTypes.SET_CART_ITEMS,
-            payload: response.data.cartData || [], // Ensure payload is always an array
+            payload: response.data.cartData || [],
           });
-
-          notifySuccess("Produk berhasil ditambahkan ke keranjang.");
+          notify('success', "Produk berhasil ditambahkan ke keranjang.");
           return response.data.cartData;
         } else {
           throw new Error(
@@ -191,9 +222,7 @@ const ShopContextProvider = ({ children }) => {
           );
         }
       } catch (error) {
-        notifyError(
-          error.message || "Kesalahan saat menambahkan item ke keranjang."
-        );
+        notify('error', error.message || "Kesalahan saat menambahkan item ke keranjang.");
         throw error;
       }
     },
@@ -203,7 +232,8 @@ const ShopContextProvider = ({ children }) => {
   const updateQuantity = useCallback(
     async (productId, variantId, optionId, quantity) => {
       if (!productId || quantity < 1) {
-        notifyError("Data tidak valid untuk memperbarui kuantitas.");
+          notify('error', "Data tidak valid untuk memperbarui kuantitas.");
+
         return;
       }
       try {
@@ -227,9 +257,7 @@ const ShopContextProvider = ({ children }) => {
           );
         }
       } catch (error) {
-        notifyError(
-          error.message || "Kesalahan saat memperbarui kuantitas keranjang."
-        );
+          notify('error', error.message || "Kesalahan saat memperbarui kuantitas keranjang.");
         throw error;
       }
     },
@@ -256,9 +284,7 @@ const ShopContextProvider = ({ children }) => {
           );
         }
       } catch (error) {
-        notifyError(
-          error.message || "Kesalahan saat menghapus item dari keranjang."
-        );
+          notify('error', error.message || "Kesalahan saat menghapus item dari keranjang.");
       }
     },
     [backendUrl, state.token]
@@ -278,7 +304,7 @@ const ShopContextProvider = ({ children }) => {
         throw new Error("Gagal mengosongkan keranjang.");
       }
     } catch (error) {
-      notifyError(error.message || "Gagal mengosongkan keranjang.");
+        notify('error', error.message || "Gagal mengosongkan keranjang.")
     }
   }, [backendUrl, state.token]);
 
@@ -296,6 +322,7 @@ const ShopContextProvider = ({ children }) => {
     }, 0);
     return totalAmount;
   }, [state.cartItems]);
+
   const value = {
     ...state,
     formatIDR,
@@ -313,7 +340,6 @@ const ShopContextProvider = ({ children }) => {
     backendUrl,
     dispatch,
   };
- 
 
   return <ShopContext.Provider value={value}>{children}</ShopContext.Provider>;
 };
