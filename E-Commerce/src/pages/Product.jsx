@@ -71,7 +71,7 @@ const Product = () => {
 
     // --- Calculate Display Price (useCallback) ---
     const calculateDisplayPrice = useCallback(() => {
-        let priceToDisplay = "Price Not Available";
+        let priceToDisplay = "";
 
         if (state.productData) { // Ensure productData is loaded
             let minPrice = null;
@@ -94,9 +94,9 @@ const Product = () => {
             }
             // 3. Format based on minPrice
            if (minPrice === Infinity || minPrice === -Infinity || isNaN(minPrice)) {
-                priceToDisplay = 'Price Not Available'; // Handle cases where no prices exist
+                priceToDisplay = ''; // Handle cases where no prices exist
             }else if (minPrice === 0) {
-                priceToDisplay = "Free"; // Or "0", or any other custom message
+                priceToDisplay = ''; // Or "0", or any other custom message
             }  else if (minPrice !== null){
                 priceToDisplay = `From ${formatIDR(minPrice)}`; // Format *before* adding "From"
             }
