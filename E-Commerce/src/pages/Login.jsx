@@ -28,8 +28,12 @@ const reducer = (state, action) => {
 
 const Login = () => {
   const [state, dispatch] = useReducer(reducer, initialState);
-  const { setToken, dispatch: globalDispatch, backendUrl, navigate } =
-    useContext(ShopContext);
+  const {
+    setToken,
+    dispatch: globalDispatch,
+    backendUrl,
+    navigate,
+  } = useContext(ShopContext);
   const [loading, setLoading] = useState(false);
 
   const onSubmitHandler = async (event) => {
@@ -46,10 +50,17 @@ const Login = () => {
         if (response.data.success) {
           globalDispatch({ type: "SET_TOKEN", payload: response.data.token });
           setToken(response.data.token);
+          console.log("Email:", state.email);
+          console.log("Password:", state.password);
+          console.log("Token:", response.data.token);
+
           navigate("/");
-          notifySuccess("Akun berhasil dibuat! 🎉");
+          notifySuccess("Akun berhasil dibuat! 🎉:",email,token);
         } else {
           notifyError(response.data.message);
+          console.log("Email:", state.email);
+          console.log("Password:", state.password);
+          console.log("Token:", response.data.token);
         }
       } else {
         const response = await axios.post(backendUrl + "/api/user/login", {
@@ -61,10 +72,17 @@ const Login = () => {
           globalDispatch({ type: "SET_TOKEN", payload: response.data.token });
           setToken(response.data.token);
           localStorage.setItem("token", response.data.token);
+          console.log("Email:", state.email);
+          console.log("Password:", state.password);
+          console.log("Token:", response.data.token);
           notifySuccess("Login berhasil! Selamat datang 👋");
           navigate("/");
         } else {
           notifyError("Email atau password salah ❌");
+          console.error(response.data.message);
+          console.log("Email:", state.email);
+          console.log("Password:", state.password);
+          console.log("Token:", response.data.token);
         }
       }
     } catch (error) {

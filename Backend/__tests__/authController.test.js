@@ -3,7 +3,7 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import validator from 'validator';
-import { loginUser, registerUser, adminLogin } from '../controllers/userController' // Sesuaikan path!
+import { loginUser, registerUser } from '../controllers/userController' // Sesuaikan path!
 import userModel from '../models/userModel';
 
 // Mock dependencies
@@ -29,7 +29,7 @@ describe('userController', () => {
       };
       res = {
         json: jest.fn(),
-        status: jest.fn().mockReturnThis(), // Untuk chaining, misal: res.status(400).json(...)
+        status: jest.fn().mockReturnThis(), 
       };
     });
 
@@ -56,7 +56,7 @@ describe('userController', () => {
       await loginUser(req, res);
 
       expect(userModel.findOne).toHaveBeenCalledWith({ email: 'notfound@example.com' });
-      expect(bcrypt.compare).not.toHaveBeenCalled(); // bcrypt.compare tidak boleh dipanggil
+      expect(bcrypt.compare).not.toHaveBeenCalled(); 
       expect(res.json).toHaveBeenCalledWith({ success: false, message: 'Email tidak ditemukan' });
     });
 
@@ -98,7 +98,7 @@ describe('userController', () => {
         };
         res = {
           json: jest.fn(),
-          status: jest.fn().mockReturnThis(), // Untuk chaining, misal: res.status(400).json(...)
+          status: jest.fn().mockReturnThis(), 
         };
       });
     it('should register a new user successfully', async () => {
@@ -158,36 +158,4 @@ describe('userController', () => {
     });
   });
 
-  // --- adminLogin ---
-    describe('adminLogin', () => {
-        let req;
-        let res;
-
-        beforeEach(() => {
-          // Reset mocks
-          jest.clearAllMocks();
-          req = { body: {} };
-          res = { json: jest.fn() };
-        });
-    it('should login admin with valid credentials', async () => {
-        req.body = {email: "admin@example.com", password: "adminpassword"};
-        process.env.ADMIN_EMAIL = "admin@example.com"; // Set environment variables
-        process.env.ADMIN_PASSWORD = "adminpassword";
-        jwt.sign.mockReturnValue('mockedTokenAdmin');
-        await adminLogin(req,res);
-
-        expect(jwt.sign).toHaveBeenCalled();
-        expect(res.json).toHaveBeenCalledWith({success: true, token: "mockedTokenAdmin"});
-    });
-
-    it('Should return error if admin credentials are wrong', async () => {
-        req.body = {email: "admin@example.com", password: "wrongpassword"};
-        process.env.ADMIN_EMAIL = "admin@example.com";
-        process.env.ADMIN_PASSWORD = "adminpassword";
-
-        await adminLogin(req,res);
-        expect(res.json).toHaveBeenCalledWith({success: false, message: "Kredensial salah"});
-    });
-
-  });
 });

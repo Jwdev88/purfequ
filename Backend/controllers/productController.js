@@ -18,7 +18,7 @@ const addProduct = async (req, res) => {
       sku,
     } = req.body;
 
-    // console.log("req.body:", req.body);
+    console.log("req.body:", req.body);
 
     // Handle image uploads
     const image1 = req.files?.image1?.[0];
