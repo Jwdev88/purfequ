@@ -8,7 +8,7 @@ import {
   placeOrderMidtrans,
   handleNotification,
 
-} from "../controllers/orderController.js";
+} from '../controllers/orderController.js';
 
 const orderRouter = express.Router();
 orderRouter.post("/list", adminAuth, allOrders);
