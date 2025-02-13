@@ -23,7 +23,7 @@ const Login = ({ setToken }) => {
     // Proceed if no errors
     if (Object.keys(validationErrors).length === 0) {
       try {
-        const response = await axios.post(backendURI + "/api/user/admin", {
+        const response = await axios.post(backendURI + "/api/user/admin/login", {
           email,
           password,
         });
