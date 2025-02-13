@@ -279,7 +279,10 @@ const usePlaceOrder = () => {
                         toast.warn("Payment window closed.");
                         // Redirect to orders page *and* pass the orderId
                         navigate(`/orders?orderId=${orderId}`);
-                    }
+                    },
+                    options: {
+                      requestTimeout: 30000, // Set timeout to 30 seconds (adjust as needed)
+                     },
                 });
             } else {
                 // Fallback to redirect URL if Snap.js is not available
