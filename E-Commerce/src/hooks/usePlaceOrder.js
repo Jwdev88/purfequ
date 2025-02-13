@@ -24,7 +24,7 @@ const initialState = {
     isLoadingCost: false,
     cost: null,
     selectedService: null,
-    orderId: null, // Store the order ID
+    orderId: null, // Add orderId to the state
 };
 
 const reducer = (state, action) => {
@@ -53,13 +53,13 @@ const reducer = (state, action) => {
             };
         case 'SET_SELECTED_CITY':
             return { ...state, formData: { ...state.formData, city: action.payload } };
-        case 'SET_ORDER_ID':
+        case 'SET_ORDER_ID':  // New action to set orderId
             return { ...state, orderId: action.payload };
         case 'RESET_FORM':
             return {
                 ...initialState,
-                provinces: state.provinces, // Keep provinces
-                isLoadingAddress: false, // Ensure address loading is off
+                provinces: state.provinces, // Keep provinces!
+                isLoadingAddress: false,  // Ensure address loading is off
             };
         default:
             return state;
@@ -74,7 +74,7 @@ const usePlaceOrder = () => {
     const citiesCache = useMemo(() => new Map(), []);
 
     // --- Fetch Provinces ---
-     useEffect(() => {
+    useEffect(() => {
       const fetchProvinces = async () => {
         try {
           const response = await apiCall(
@@ -171,55 +171,40 @@ const usePlaceOrder = () => {
 
     // --- Calculate Shipping Cost ---
     const calculateShippingCost = useCallback(async () => {
-      if (!state.formData.city || state.cities.length === 0) {
-        dispatch({ type: "SET_COST", payload: null });
-        return;
-      }
-
-      dispatch({ type: "SET_LOADING_COST", payload: true });
-      try {
-        const payload = {
-          origin: "501", //  <<---  REPLACE WITH YOUR ORIGIN!
-          destination: state.formData.city,
-          weight: cartItems.reduce(
-            (acc, item) =>
-              acc +
-              (item.variant?.selectedOption?.optionWeight ??
-                item.productWeight ??
-                0) *
-                item.quantity,
-            0
-          ),
-          courier: "jne", // Consider making this dynamic
-        };
-        const response = await apiCall(
-          `${backendUrl}/api/rajaongkir/cost`,
-          "POST",
-          payload,
-          token
-        );
-
-        if (!response.data.success) {
-          throw new Error(
-            response.data.message || "Failed to fetch shipping cost"
-          );
+        if (!state.formData.city || state.cities.length === 0) {
+            dispatch({ type: 'SET_COST', payload: null });
+            return;
         }
-        dispatch({ type: "SET_COST", payload: response.data.costs });
-      } catch (error) {
-        console.error("Error fetching shipping cost:", error);
-        toast.error(error.message);
-        dispatch({ type: "SET_COST", payload: null });
-      } finally {
-        dispatch({ type: "SET_LOADING_COST", payload: false });
-      }
-    }, [backendUrl, cartItems,state.formData.city, state.cities.length, token]);
+
+        dispatch({ type: 'SET_LOADING_COST', payload: true });
+        try {
+            const payload = {
+                origin: "501",  //  <<---  REPLACE WITH YOUR ORIGIN!
+                destination: state.formData.city,
+                weight: cartItems.reduce((acc, item) => acc + (item.variant?.selectedOption?.optionWeight ?? item.productWeight ?? 0) * item.quantity, 0),
+                courier: "jne", // Consider making this dynamic
+            };
+            const response = await apiCall(`${backendUrl}/api/rajaongkir/cost`, "POST", payload, token);
+
+            if (!response.data.success) {
+                throw new Error(response.data.message || 'Failed to fetch shipping cost');
+            }
+            dispatch({ type: 'SET_COST', payload: response.data.costs });
+        } catch (error) {
+            console.error("Error fetching shipping cost:", error);
+            toast.error(error.message);
+            dispatch({ type: 'SET_COST', payload: null });
+        } finally {
+            dispatch({ type: 'SET_LOADING_COST', payload: false });
+        }
+    }, [backendUrl, cartItems, state.formData.city, state.cities.length, token]); // Correct dependencies
 
       // --- Trigger Shipping Cost Calculation (useEffect) ---
-      useEffect(() => {
+    useEffect(() => {
         if (state.formData.city && state.cities.length > 0) {
-             calculateShippingCost();
+            calculateShippingCost();
         }
-    }, [state.formData.city,state.cities.length, calculateShippingCost]);
+    }, [state.formData.city, state.cities.length, calculateShippingCost]);
 
 
       // --- Trigger fetchCities when province changes ---
@@ -244,72 +229,72 @@ const usePlaceOrder = () => {
     }, [dispatch]);
 
    // --- Handle Order Submission (with Midtrans integration) ---
-const handleOrderSubmission = async (orderData) => {
-    try {
-        dispatch({ type: 'SET_LOADING', payload: true });
-        const response = await apiCall(`${backendUrl}/api/order/midtrans`, "POST", orderData, token);
+    const handleOrderSubmission = async (orderData) => {
+        try {
+            dispatch({ type: 'SET_LOADING', payload: true });
+            const response = await apiCall(`${backendUrl}/api/order/midtrans`, "POST", orderData, token);
 
-        if (!response.data.success) {
-            throw new Error(response.data.message || "Failed to create order");
-        }
+            if (!response.data.success) {
+                throw new Error(response.data.message || "Failed to create order");
+            }
 
-        const { token: midtransToken, orderId, redirect_url } = response.data; //  Get redirect_url
+            const { token: midtransToken, orderId, redirect_url } = response.data; // Get redirect_url
 
-        if (!midtransToken || !orderId) {
+            if (!midtransToken || !orderId) {
+                dispatch({ type: 'SET_LOADING', payload: false });
+                toast.error("Failed to get payment token from Midtrans.");
+                return;
+            }
+
+             // Store orderId in localStorage and state
+              localStorage.setItem('orderId', orderId);
+              dispatch({ type: 'SET_ORDER_ID', payload: orderId });
+
+
+            // Use Snap.js for payment (if not using redirect)
+            if (window.snap) {
+                window.snap.pay(midtransToken, {
+                    onSuccess: (result) => {
+                        console.log("Midtrans success:", result);
+                        toast.success("Payment successful!");
+                        clearCart(); //  Only clear on success
+                        localStorage.removeItem('orderId'); //remove order id
+                        navigate('/orders');
+                    },
+                    onPending: (result) => {
+                        console.log("Midtrans pending:", result);
+                        toast.info("Payment pending. Please check your order status.");
+                        localStorage.removeItem('orderId'); //remove order id
+                        navigate('/orders'); // Go to orders, but don't clear the cart
+                    },
+                    onError: (result) => {
+                        console.log("Midtrans error:", result);
+                        dispatch({ type: 'SET_LOADING', payload: false }); // Stop loading
+                        toast.error("Payment failed! Please try again.");
+                        // Consider *not* clearing the cart here, so the user can retry.
+                    },
+                    onClose: () => {
+                        console.log("Midtrans closed");
+                        dispatch({ type: 'SET_LOADING', payload: false });// Stop loading
+                        toast.warn("Payment window closed.");
+                        // Redirect to orders page *and* pass the orderId
+                        navigate(`/orders?orderId=${orderId}`);
+                    }
+                });
+            } else {
+                // Fallback to redirect URL if Snap.js is not available
+                window.location.href = redirect_url;
+            }
+
+        } catch (error) {
+            console.error("Error creating order:", error);
             dispatch({ type: 'SET_LOADING', payload: false });
-            toast.error("Failed to get payment token from Midtrans.");
-            return;
+            toast.error(error.message || 'Failed to create order.');
+        } finally {
+             dispatch({type: 'RESET_FORM'}) //reset form
+             dispatch({ type: 'SET_LOADING', payload: false }); // Ensure loading is off, even on error
         }
-
-        // Store orderId in localStorage and state
-        localStorage.setItem('orderId', orderId);
-        dispatch({ type: 'SET_ORDER_ID', payload: orderId });
-
-
-        // Use Snap.js for payment (if not using redirect)
-        if (window.snap) {
-            window.snap.pay(midtransToken, {
-                onSuccess: (result) => {
-                    console.log("Midtrans success:", result);
-                    toast.success("Payment successful!");
-                    clearCart();
-                    localStorage.removeItem('orderId');
-                    navigate('/orders');
-                },
-                onPending: (result) => {
-                    console.log("Midtrans pending:", result);
-                    toast.info("Payment pending. Please check your order status.");
-                    localStorage.removeItem('orderId');
-                    navigate('/orders'); // Go to orders, but don't clear the cart
-                },
-                onError: (result) => {
-                    console.log("Midtrans error:", result);
-                    toast.error("Payment failed! Please try again.");
-                    // Consider *not* clearing the cart here.
-                },
-                onClose: () => {
-                    console.log("Midtrans closed");
-                    toast.warn("Payment window closed.  Redirecting to orders...");
-                    // Redirect to orders page *and* pass the orderId
-                    navigate(`/orders?orderId=${orderId}`);
-                }
-            });
-        } else {
-            // Fallback to redirect URL if Snap.js is not available
-            window.location.href = redirect_url;
-        }
-
-
-
-    } catch (error) {
-        console.error("Error creating order:", error);
-        toast.error(error.message || 'Failed to create order.');
-    } finally {
-          dispatch({type: 'RESET_FORM'}) //reset form
-          dispatch({ type: 'SET_LOADING', payload: false });
-    }
-};
-
+    };
 
     return {
         state,

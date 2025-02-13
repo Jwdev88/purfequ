@@ -4,7 +4,7 @@ import { ShopContext } from "../context/ShopContext";
 import axios from "axios";
 import { Loader2Icon as Loader } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
-
+import { toast } from "react-toastify";
 const Orders = () => {
     const { backendUrl, token, formatIDR } = useContext(ShopContext);
     const [orderData, setOrderData] = useState([]);
