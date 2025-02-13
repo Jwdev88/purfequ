@@ -1,6 +1,6 @@
 // middleware/authUser.js
 import jwt from "jsonwebtoken";
-import userModel from "../models/userModel.js"; // Gunakan nama yang konsisten (userModel)
+import userModel from "../models/userModel.js";
 
 const authUser = async (req, res, next) => {
   try {
@@ -12,15 +12,25 @@ const authUser = async (req, res, next) => {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    if (!token) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Token tidak valid." });
-    }
+    // console.log("Received token:", token); // Debug: Log the token
 
-    let decoded; // Deklarasikan di luar try/catch
+
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      // console.log("Decoded payload:", decoded); // Debug: Log the decoded payload
+
+      const user = await userModel.findById(decoded.userId);
+
+      if (!user) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Pengguna tidak ditemukan." });
+      }
+
+      req.user = user;
+      req.userId = decoded.userId;
+      next();
+
     } catch (error) {
       if (error.name === "JsonWebTokenError") {
         return res
@@ -32,25 +42,15 @@ const authUser = async (req, res, next) => {
           .json({ success: false, message: "Token kadaluarsa." });
       } else {
         return res
-          .status(401)
+          .status(401) // 401 lebih tepat daripada 500 untuk masalah autentikasi.
           .json({ success: false, message: "Autentikasi gagal." });
       }
     }
-
-    const user = await userModel.findById(decoded.userId);
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Pengguna tidak ditemukan." });
-    }
-
-    req.user = user;
-    next();
   } catch (error) {
     console.error("Kesalahan autentikasi:", error);
     res
       .status(500)
-      .json({ success: false, message: "Terjadi kesalahan pada server." }); // Lebih baik 500
+      .json({ success: false, message: "Terjadi kesalahan pada server." });
   }
 };
 

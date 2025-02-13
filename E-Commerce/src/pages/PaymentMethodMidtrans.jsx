@@ -9,7 +9,7 @@ const PaymentMethodMidtrans = ({ selectedMethod, setSelectedMethod }) => {
           selectedMethod === "midtrans"? "bg-teal-600": ""
         }`}
       >
-        Pay with Midtrans
+        Pay
       </button>
     </div>
   );

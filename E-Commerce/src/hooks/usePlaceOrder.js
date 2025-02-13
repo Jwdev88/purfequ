@@ -1,253 +1,324 @@
+// --- hooks/usePlaceOrder.js ---
+import { useReducer, useCallback, useEffect, useContext, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ShopContext } from '../context/ShopContext';
+import { toast } from 'react-toastify';
+import {apiCall} from '../utils/apiCall';
 
-import { useReducer, useCallback, useEffect, useMemo,useContext } from "react";
-import { notifySuccess, notifyError,notifyWarningWithAction } from "../components/ToastNotification";
-import { useNavigate } from "react-router-dom";
-import { actionTypes } from "../context/actionTypes";
-import { apiCall } from "../utils/apiCall";
-import { ShopContext } from "../context/ShopContext";
 const initialState = {
-  selectedProvince: "",
-  selectedCity: "",
-  cost: null,
-  isLoading: false,
-  formData: {
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-    address: "",
-  },
-  selectedService: null,
-  method: "cod",
-  isLoadingCost: false,
-  cities: [],
-  provinces: [],
+    formData: {
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        address: '',
+        state: '',
+        postalCode: '',
+        province: '',
+        city: '',
+    },
+    provinces: [],
+    cities: [],
+    isLoading: false,          // Only for the submit button
+    isLoadingAddress: false,
+    isLoadingCost: false,
+    cost: null,
+    selectedService: null,
+    orderId: null, // Store the order ID
 };
 
 const reducer = (state, action) => {
-  switch (action.type) {
-    case actionTypes.SET_FORM_DATA:
-      return { ...state, formData: { ...state.formData, ...action.payload } };
-    case actionTypes.SET_SELECTED_PROVINCE:
-      return {
-        ...state,
-        selectedProvince: action.payload,
-        selectedCity: "",
-        cities: [],
-      };
-    case actionTypes.SET_SELECTED_CITY:
-      return { ...state, selectedCity: action.payload };
-    case actionTypes.SET_COST:
-      return { ...state, cost: action.payload };
-    case actionTypes.SET_LOADING:
-      return { ...state, isLoading: action.payload };
-    case actionTypes.SET_SELECTED_SERVICE:
-      return { ...state, selectedService: action.payload };
-    case actionTypes.SET_METHOD:
-      return { ...state, method: action.payload };
-    case actionTypes.SET_LOADING_COST:
-      return { ...state, isLoadingCost: action.payload };
-    case actionTypes.SET_CITIES:
-      return { ...state, cities: action.payload };
-    case actionTypes.SET_PROVINCES:
-      return { ...state, provinces: action.payload };
-    default:
-      return state;
-  }
+    switch (action.type) {
+        case 'SET_FORM_DATA':
+            return { ...state, formData: { ...state.formData, ...action.payload } };
+        case 'SET_PROVINCES':
+            return { ...state, provinces: action.payload };
+        case 'SET_CITIES':
+            return { ...state, cities: action.payload };
+        case 'SET_LOADING':
+            return { ...state, isLoading: action.payload };
+        case 'SET_LOADING_ADDRESS':
+            return { ...state, isLoadingAddress: action.payload };
+        case 'SET_LOADING_COST':
+            return { ...state, isLoadingCost: action.payload };
+        case 'SET_COST':
+            return { ...state, cost: action.payload };
+        case 'SET_SELECTED_SERVICE':
+            return { ...state, selectedService: action.payload };
+        case 'SET_SELECTED_PROVINCE':
+            return {
+                ...state,
+                formData: { ...state.formData, province: action.payload, city: '' },
+                cities: [], // Clear cities when province changes
+            };
+        case 'SET_SELECTED_CITY':
+            return { ...state, formData: { ...state.formData, city: action.payload } };
+        case 'SET_ORDER_ID':
+            return { ...state, orderId: action.payload };
+        case 'RESET_FORM':
+            return {
+                ...initialState,
+                provinces: state.provinces, // Keep provinces
+                isLoadingAddress: false, // Ensure address loading is off
+            };
+        default:
+            return state;
+    }
 };
 
-const usePlaceOrder = (cartItems, backendUrl, token) => {
-  const [state, dispatch] = useReducer(reducer, initialState);
-  const navigate = useNavigate();
-  const citiesCache = useMemo(() => new Map(), []); // Cache to store cities by province
-  const { dispatch: globalDispatch } = useContext(ShopContext);
-  // Fetch provinces on component mount
-  useEffect(() => {
-    const fetchProvinces = async () => {
-      try {
-        const response = await apiCall(`${backendUrl}/api/rajaongkir/provinces`);
-        dispatch({
-          type: actionTypes.SET_PROVINCES,
-          payload: response.data.provinces,
-        });
-      } catch (error) {
-        notifyError("Failed to fetch provinces.");
-      }
-    };
-    fetchProvinces();
-  }, [backendUrl]);
+const usePlaceOrder = () => {
+    const [state, dispatch] = useReducer(reducer, initialState);
+    const navigate = useNavigate();
+    const { clearCart, backendUrl, token, cartItems } = useContext(ShopContext);
 
-  // Fetch cities based on selected province
-  const fetchCities = useCallback(
-    async (provinceId) => {
-      if (citiesCache.has(provinceId)) {
-        dispatch({
-          type: actionTypes.SET_CITIES,
-          payload: citiesCache.get(provinceId),
-        });
-        return;
-      }
+    const citiesCache = useMemo(() => new Map(), []);
 
-      try {
-        dispatch({ type: actionTypes.SET_LOADING, payload: true });
-        const response = await apiCall(`${backendUrl}/api/rajaongkir/cities/${provinceId}`);
-        citiesCache.set(provinceId, response.data);
-        dispatch({ type: actionTypes.SET_CITIES, payload: response.data });
-      } catch (error) {
-        notifyError("Failed to fetch cities.");
-        dispatch({ type: actionTypes.SET_CITIES, payload: [] });
-      } finally {
-        dispatch({ type: actionTypes.SET_LOADING, payload: false });
-      }
-    },
-    [backendUrl, citiesCache]
-  );
-
-  // Handle province change, reset city and fetch new cities
-  const handleProvinceChange = (provinceId) => {
-    if (provinceId !== state.selectedProvince) { // Prevent unnecessary updates
-      dispatch({ type: actionTypes.SET_SELECTED_PROVINCE, payload: provinceId });
-      dispatch({
-        type: actionTypes.SET_FORM_DATA,
-        payload: { selectedProvince: provinceId },
-      });
-      fetchCities(provinceId); // Fetch cities for the selected province
-    }
-  };
-
-  // Handle city change
-  const handleCityChange = (cityId) => {
-    if (cityId !== state.selectedCity) { // Prevent unnecessary updates
-      dispatch({ type: actionTypes.SET_SELECTED_CITY, payload: cityId });
-      dispatch({
-        type: actionTypes.SET_FORM_DATA,
-        payload: { selectedCity: cityId },
-      });
-    }
-  };
-
-const calculateShippingCost = useCallback(async () => {
-  if (!state.selectedCity || !state.selectedProvince) return;
-
-  const totalWeight = cartItems.reduce((total, item) => {
-    // Check if the item has a variant and use the optionWeight from the selected variant if available
-    const itemWeight = item.variant?.selectedOption?.optionWeight ?? item.productWeight ?? 0;
-    return total + (itemWeight * item.quantity);
-  }, 0);
-  // Pastikan berat total tidak 0
-  if (totalWeight === 0) {
-    notifyError("Total weight cannot be zero");
-    return;
-  }
-
-  try {
-    dispatch({ type: actionTypes.SET_LOADING_COST, payload: true });
-    const response = await apiCall(
-      `${backendUrl}/api/rajaongkir/cost`,
-      "POST",
-      {
-        origin: state.selectedProvince,
-        destination: state.selectedCity,
-        weight: totalWeight,  // Menggunakan total berat produk
-        courier: "jne",
-      },
-      token
-    );
-    dispatch({ type: actionTypes.SET_COST, payload: response.data });
-  } catch (error) {
-    notifyError("Failed to calculate shipping cost.");
-  } finally {
-    dispatch({ type: actionTypes.SET_LOADING_COST, payload: false });
-  }
-}, [state.selectedProvince, state.selectedCity, cartItems, token, backendUrl]);
-
-
-  // Trigger shipping cost calculation when city or province changes
-  useEffect(() => {
-    if (state.selectedCity) {
-      calculateShippingCost();
-    }
-  }, [state.selectedCity, calculateShippingCost]);
-
-  // Handle order submission (COD or Midtrans)
-  const handleOrderSubmission = async (paymentMethod, orderData) => {
-    try {
-      // 🔹 Validasi alamat, cart, dan layanan pengiriman
-      if (!state.formData.address || !state.selectedProvince || !state.selectedCity) {
-        notifyError("Please provide a complete address (address, province, and city).");
-        return;
-      }
-  
-      if (!cartItems.length) {
-        notifyError("Your cart is empty");
-        return;
-      }
-  
-      if (!state.selectedService) {
-        notifyError("Please select a shipping service");
-        return;
-      }
-  
-      let response;
-      
-      if (paymentMethod === "midtrans") {
-        response = await apiCall(`${backendUrl}/api/order/midtrans`, "POST", orderData, token);
-      } else if (paymentMethod === "cod") {
-        response = await apiCall(`${backendUrl}/api/order/place`, "POST", orderData, token);
-      }
-  
-      if (!response) {
-        notifyError("Failed to process your order. Please try again.");
-        return;
-      }
-  
-      if (paymentMethod === "midtrans") {
-        const orderId = response.data.orderId;
-      
-        if (!orderId) {
-          notifyError("Order ID is missing. Please try again.");
-          return;
-        }
-      
-        window.snap.pay(response.data.token, {
-          onSuccess: async () => {
-            notifySuccess("Payment successful!");
-            globalDispatch({ type: actionTypes.CLEAR_CART });
-            navigate("/orders");
-          },
-          onPending: () => {
-            notifyWarningWithAction(
-              "Your payment is pending. Please complete the payment via Midtrans.",
-              "Check Status",
-              () => navigate("/orders")
+    // --- Fetch Provinces ---
+     useEffect(() => {
+      const fetchProvinces = async () => {
+        try {
+          const response = await apiCall(
+            `${backendUrl}/api/rajaongkir/provinces`,
+            "GET",
+            {},
+            token
+          );
+          if (!response.data.success) {
+            throw new Error(
+              response.data.message || "Failed to fetch provinces"
             );
-          },
-          onError: () => {
-            notifyError("Payment failed. Please try again.");
           }
-        });
-      }
-       else if (paymentMethod === "cod" && response.data.success) {
-        // 🔹 COD sukses, kosongkan cart
-        globalDispatch({ type: actionTypes.CLEAR_CART });
-        notifySuccess("Order placed successfully!");
-        navigate("/orders");
-      } else {
-        notifyError("Failed to process your order. Please try again.");
-      }
-    } catch (error) {
-      notifyError("An error occurred while processing your order. Please try again.");
-    }
-  };
-  
+          dispatch({ type: "SET_PROVINCES", payload: response.data.provinces });
+        } catch (error) {
+          console.error(error);
+          toast.error(error.message || "Failed to fetch provinces.");
+        }
+      };
+      fetchProvinces();
+    }, [backendUrl, token]);
 
-  return {
-    state,
-    dispatch,
-    handleProvinceChange,
-    handleCityChange,
-    handleOrderSubmission,
-  };
+    // --- Fetch Cities ---
+    const fetchCities = useCallback(async (provinceId) => {
+        if (!provinceId) {
+            dispatch({ type: 'SET_CITIES', payload: [] });
+            return;
+        }
+
+        if (citiesCache.has(provinceId)) {
+            dispatch({ type: 'SET_CITIES', payload: citiesCache.get(provinceId) });
+            return;
+        }
+
+        try {
+            // No global loading state here.
+            const response = await apiCall(`${backendUrl}/api/rajaongkir/cities/${provinceId}`, 'GET', {}, token);
+            if (!response.data.success) {
+                throw new Error(response.data.message || "Failed to fetch cities");
+            }
+            citiesCache.set(provinceId, response.data.cities);
+            dispatch({ type: 'SET_CITIES', payload: response.data.cities });
+        } catch (error) {
+            console.error("Error fetching cities:", error);
+            toast.error(error.message || "Failed to fetch cities.");
+            dispatch({ type: 'SET_CITIES', payload: [] });
+        }
+    }, [backendUrl, token, citiesCache]);
+
+    // --- Prefill Address ---
+    useEffect(() => {
+        const fetchUserAddresses = async () => {
+            try {
+                dispatch({ type: 'SET_LOADING_ADDRESS', payload: true });
+                const response = await apiCall(`${backendUrl}/api/user/addresses`, 'GET', {}, token);
+                if (!response.ok) {
+                    throw new Error(response.data.message || "Failed to fetch addresses");
+                }
+
+                const addresses = response.data.addresses;
+                if (addresses && addresses.length > 0) {
+                    const defaultAddress = addresses[0];
+                    dispatch({
+                        type: 'SET_FORM_DATA',
+                        payload: {
+                            firstName: defaultAddress.firstName,
+                            lastName: defaultAddress.lastName,
+                            email: defaultAddress.email,
+                            phone: defaultAddress.phone,
+                            address: defaultAddress.street,
+                            province: defaultAddress.provinceId,
+                            city: defaultAddress.cityId,
+                            state: defaultAddress.state,
+                            postalCode: defaultAddress.postalCode,
+                        },
+                    });
+
+                    if (defaultAddress.provinceId) {
+                        await fetchCities(defaultAddress.provinceId);
+                    }
+                }
+            } catch (error) {
+                console.error("Error fetching user addresses:", error);
+                toast.error(error.message || 'Failed to fetch user address.');
+            } finally {
+                dispatch({ type: 'SET_LOADING_ADDRESS', payload: false });
+            }
+        };
+
+        if (token) {
+            fetchUserAddresses();
+        }
+    }, [backendUrl, token, fetchCities]);
+
+    // --- Calculate Shipping Cost ---
+    const calculateShippingCost = useCallback(async () => {
+      if (!state.formData.city || state.cities.length === 0) {
+        dispatch({ type: "SET_COST", payload: null });
+        return;
+      }
+
+      dispatch({ type: "SET_LOADING_COST", payload: true });
+      try {
+        const payload = {
+          origin: "501", //  <<---  REPLACE WITH YOUR ORIGIN!
+          destination: state.formData.city,
+          weight: cartItems.reduce(
+            (acc, item) =>
+              acc +
+              (item.variant?.selectedOption?.optionWeight ??
+                item.productWeight ??
+                0) *
+                item.quantity,
+            0
+          ),
+          courier: "jne", // Consider making this dynamic
+        };
+        const response = await apiCall(
+          `${backendUrl}/api/rajaongkir/cost`,
+          "POST",
+          payload,
+          token
+        );
+
+        if (!response.data.success) {
+          throw new Error(
+            response.data.message || "Failed to fetch shipping cost"
+          );
+        }
+        dispatch({ type: "SET_COST", payload: response.data.costs });
+      } catch (error) {
+        console.error("Error fetching shipping cost:", error);
+        toast.error(error.message);
+        dispatch({ type: "SET_COST", payload: null });
+      } finally {
+        dispatch({ type: "SET_LOADING_COST", payload: false });
+      }
+    }, [backendUrl, cartItems,state.formData.city, state.cities.length, token]);
+
+      // --- Trigger Shipping Cost Calculation (useEffect) ---
+      useEffect(() => {
+        if (state.formData.city && state.cities.length > 0) {
+             calculateShippingCost();
+        }
+    }, [state.formData.city,state.cities.length, calculateShippingCost]);
+
+
+      // --- Trigger fetchCities when province changes ---
+      useEffect(() => {
+        if(state.formData.province){
+             fetchCities(state.formData.province)
+        }
+
+    }, [state.formData.province, fetchCities])
+
+    // --- Handlers ---
+    const handleProvinceChange = useCallback((provinceId) => {
+        dispatch({ type: 'SET_SELECTED_PROVINCE', payload: provinceId });
+    }, [dispatch]);
+
+    const handleCityChange = useCallback((cityId) => {
+        dispatch({ type: 'SET_SELECTED_CITY', payload: cityId });
+    }, [dispatch]);
+
+    const handleServiceSelect = useCallback((service) => {
+        dispatch({ type: "SET_SELECTED_SERVICE", payload: service });
+    }, [dispatch]);
+
+   // --- Handle Order Submission (with Midtrans integration) ---
+const handleOrderSubmission = async (orderData) => {
+    try {
+        dispatch({ type: 'SET_LOADING', payload: true });
+        const response = await apiCall(`${backendUrl}/api/order/midtrans`, "POST", orderData, token);
+
+        if (!response.data.success) {
+            throw new Error(response.data.message || "Failed to create order");
+        }
+
+        const { token: midtransToken, orderId, redirect_url } = response.data; //  Get redirect_url
+
+        if (!midtransToken || !orderId) {
+            dispatch({ type: 'SET_LOADING', payload: false });
+            toast.error("Failed to get payment token from Midtrans.");
+            return;
+        }
+
+        // Store orderId in localStorage and state
+        localStorage.setItem('orderId', orderId);
+        dispatch({ type: 'SET_ORDER_ID', payload: orderId });
+
+
+        // Use Snap.js for payment (if not using redirect)
+        if (window.snap) {
+            window.snap.pay(midtransToken, {
+                onSuccess: (result) => {
+                    console.log("Midtrans success:", result);
+                    toast.success("Payment successful!");
+                    clearCart();
+                    localStorage.removeItem('orderId');
+                    navigate('/orders');
+                },
+                onPending: (result) => {
+                    console.log("Midtrans pending:", result);
+                    toast.info("Payment pending. Please check your order status.");
+                    localStorage.removeItem('orderId');
+                    navigate('/orders'); // Go to orders, but don't clear the cart
+                },
+                onError: (result) => {
+                    console.log("Midtrans error:", result);
+                    toast.error("Payment failed! Please try again.");
+                    // Consider *not* clearing the cart here.
+                },
+                onClose: () => {
+                    console.log("Midtrans closed");
+                    toast.warn("Payment window closed.  Redirecting to orders...");
+                    // Redirect to orders page *and* pass the orderId
+                    navigate(`/orders?orderId=${orderId}`);
+                }
+            });
+        } else {
+            // Fallback to redirect URL if Snap.js is not available
+            window.location.href = redirect_url;
+        }
+
+
+
+    } catch (error) {
+        console.error("Error creating order:", error);
+        toast.error(error.message || 'Failed to create order.');
+    } finally {
+          dispatch({type: 'RESET_FORM'}) //reset form
+          dispatch({ type: 'SET_LOADING', payload: false });
+    }
+};
+
+
+    return {
+        state,
+        dispatch,
+        handleProvinceChange,
+        handleCityChange,
+        handleOrderSubmission,
+        handleServiceSelect,
+    };
 };
 
 export default usePlaceOrder;

@@ -12,7 +12,10 @@ import Navbar from './components/Navbar'
 import About from './pages/About'
 import Footer from './components/Footer'
 import SearchBar from './components/SearchBar'
-
+import UpdateProfile from './components/UpdateProfile';
+import AddressList from './components/AddressList';
+import AddAddress from './components/AddAddress';
+import UpdateAddress from './components/UpdateAddress';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 const App = () => {
@@ -31,7 +34,10 @@ const App = () => {
         <Route path='login' element={<Login/>}/>
         <Route path='place-order' element={<PlaceOrder/>}/>
         <Route path='orders' element={<Orders/>}/>   
-    
+        <Route path="/profile" element={<UpdateProfile />} />
+        <Route path="/addresses" element={<AddressList />} />
+        <Route path="/add-address" element={<AddAddress />} />
+        <Route path="/update-address/:addressId" element={<UpdateAddress />} />
 
       
       </Routes>

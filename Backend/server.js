@@ -28,13 +28,6 @@ app.use('/api/rajaongkir',rajaOngkirRouter)
 app.use('/api/category',categoryRouter)
 app.use('/api/subcategory',subCategoryRouter)
 // Log semua routes yang terdaftar
-app._router.stack.forEach((middleware) => {
-    if (middleware.route) { // Ini untuk mengecek apakah ini route
-      console.log(`${middleware.route.stack[0].method.toUpperCase()} ${middleware.route.path}`);
-    }
-  });
-app.get('/',(req,res)=>{
-    res.send("Api berjalan ")
-})
+
 
 app.listen(port,()=>console.log(`Server Started on PORT : `+ port))

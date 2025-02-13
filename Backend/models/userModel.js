@@ -8,17 +8,19 @@ const cartItemSchema = new mongoose.Schema({
   quantity: { type: Number, required: true, default: 1 },
 });
 
-// Skema untuk Alamat Pengguna (addressSchema)
 const addressSchema = new mongoose.Schema({
   firstName: { type: String, required: true },
   lastName: { type: String, required: true },
   email: { type: String, required: true },
   phone: { type: String, required: true },
-  street: { type: String, required: true },
-  city: { type: String, required: true },
-  state: { type: String, required: true },
+  street: { type: String, required: true }, // Ganti 'address' jadi 'street'
+  city: { type: String, required: true },      // Tetap simpan city name untuk display
+  cityId: { type: String, required: true },   // Tambahkan cityId  <-- ID Kota
+  province: { type: String, required: true },  // Tetap simpan province name
+  provinceId: { type: String, required: true }, // Tambahkan provinceId <-- ID Provinsi
+  state: { type: String, required: true },     // State/Provinsi (untuk tampilan)
   postalCode: { type: String, required: true },
-});
+}, { _id: true });
 
 // Skema User dengan cartData dan address
 const userSchema = new mongoose.Schema({
@@ -29,7 +31,7 @@ const userSchema = new mongoose.Schema({
     type: [cartItemSchema], // Item-item di keranjang
     default: [],
   },
-  addresses: [addressSchema], // Alamat-alamat pengguna
+  address: [addressSchema], // Alamat-alamat pengguna
 });
 
 // Metode untuk mempopulasi cartData dengan Product, Variant, dan Option terkait

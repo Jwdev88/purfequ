@@ -1,18 +1,16 @@
-import { model } from "mongoose";
 import orderModel from "../models/ordermodel.js";
 import UserModel from "../models/userModel.js";
 import midtransClient from "midtrans-client";
 import { v4 as uuidv4 } from "uuid";
 
-let core = new midtransClient.CoreApi();
-
-// Inisialisasi Core API dengan Server Key
+// Inisialisasi Snap (untuk membuat transaksi)
 let snap = new midtransClient.Snap({
-  isProduction: false,
+  isProduction: false, // Ganti ke true jika sudah production
   serverKey: process.env.MIDTRANS_SERVER_KEY,
+  clientKey: process.env.MIDTRANS_CLIENT_KEY, //  Tambahkan client key!
 });
 
-// Common function to create order
+// Function to create order
 const createOrder = async (
   userId,
   items,
@@ -20,26 +18,20 @@ const createOrder = async (
   address,
   paymentMethod,
   ongkir,
-  transactionToken = null
+  transactionToken = null,
+  order_id = null // Add order_id as parameter
 ) => {
-  let payment = null;
-
-  if (paymentMethod === "COD") {
-    payment = false;
-  } else if (paymentMethod === "Midtrans") {
-    payment = "pending";
-  }
-
   const orderData = {
     userId,
     items,
     address,
-    status: "Order Placed",
+    status: "Order Placed", // Initial status
     amount,
     paymentMethod,
-    ongkir, // Simpan ongkir di order
-    payment: false,
+    ongkir,
+    payment: false, // Default to false, updated by Midtrans notification
     transactionToken,
+    orderId: order_id, // Use passed-in order_id
     date: Date.now(),
   };
 
@@ -48,42 +40,14 @@ const createOrder = async (
   return newOrder;
 };
 
-// COD METHOD - Place Order for COD
-const placeOrder = async (req, res) => {
-  try {
-    const { items, amount, address, ongkir } = req.body;
-    const userId = req.user._id || req.params.userId || req.query.userId;
-
-    if (!userId) return res.status(400).json({ message: "Missing userId" });
-    if (!items || !Array.isArray(items) || items.length === 0)
-      return res.status(400).json({ message: "Items are missing or invalid" });
-    if (!amount) return res.status(400).json({ message: "Amount is missing" });
-    if (!address)
-      return res.status(400).json({ message: "Address is missing" });
-    if (!ongkir) return res.status(400).json({ message: "Ongkir is missing" });
-    // Create COD order with 'payment' set to false
-    await createOrder(userId, items, amount, address, "COD", ongkir);
-
-    // Clear the user's cart data
-
-    await UserModel.findByIdAndUpdate(userId, { cartData: [] });
-
-    res.json({ success: true, message: "Order Placed", paymentMethod: "COD" });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// Midtrans METHOD - Place Order with Midtrans Payment
-// Function to handle placing an order with Midtrans
 const placeOrderMidtrans = async (req, res) => {
   try {
     const { items, amount, address, ongkir } = req.body;
     const userId = req.user?._id || req.params.userId || req.query.userId;
-    console.log("req body:", items, ongkir, address);
 
-    if (!userId) return res.status(400).json({ message: "Missing userId" });
+    if (!userId) {
+      return res.status(400).json({ message: "Missing userId" });
+    }
 
     const item_details = items.map((item) => ({
       id: item.id || item.productId,
@@ -104,11 +68,11 @@ const placeOrderMidtrans = async (req, res) => {
       (total, item) => total + item.price * item.quantity,
       0
     );
-    const order_id = uuidv4();
+    const order_id = uuidv4(); // Generate unique order_id
 
     const parameter = {
       transaction_details: {
-        order_id: order_id,
+        order_id: order_id, // Use the generated order_id
         gross_amount: gross_amount,
       },
       credit_card: {
@@ -119,11 +83,11 @@ const placeOrderMidtrans = async (req, res) => {
         last_name: address.lastName,
         email: address.email,
         phone: address.phone,
-        shipping_address: address,
+        shipping_address: address, // Use the full address object
       },
       item_details,
     };
-    console.log("parameter:", parameter);
+
     const transaction = await snap.createTransaction(parameter);
 
     if (!transaction || !transaction.token) {
@@ -132,37 +96,44 @@ const placeOrderMidtrans = async (req, res) => {
         .json({ success: false, message: "Failed to generate payment token" });
     }
 
+    // Create the order *before* redirecting, with initial status
     const newOrder = await createOrder(
       userId,
       items,
       gross_amount,
       address,
-      "Midtrans",
+      "Midtrans", // paymentMethod
       ongkir,
-      transaction.token
+      transaction.token,
+      order_id // Pass the order_id
     );
+
+    // Set initial status to 'pending'
     newOrder.status = "pending";
     await newOrder.save();
 
+    // Clear user's cart (assuming you have a cart system)
     await UserModel.findByIdAndUpdate(userId, { cartData: [] });
-    console.log("cartdata:", UserModel);
 
     res.status(201).json({
       success: true,
       message: "Order Placed",
-      token: transaction.token,
-      orderId: order_id,
-      amount: gross_amount,
-      address,
-      item_details,
+      token: transaction.token, // Midtrans transaction token
+      redirect_url: transaction.redirect_url, //  Send redirect_url
+      orderId: order_id, //  Consistent order ID
     });
   } catch (error) {
     console.error("Error placing Midtrans order:", error);
-    res.status(500).json({ success: false, message: "Failed to place order" });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to place order",
+        error: error.message,
+      }); // Include error message
   }
 };
-
-// Fetch all orders for admin panel
+// Fetch all orders for admin panel (No changes needed here)
 const allOrders = async (req, res) => {
   try {
     const orders = await orderModel.find({});
@@ -202,7 +173,7 @@ const userOrders = async (req, res) => {
   }
 };
 
-// Update order status from admin panel
+// Update order status from admin panel (No changes needed here)
 const updateStatus = async (req, res) => {
   try {
     const { orderId, status } = req.body;
@@ -215,15 +186,11 @@ const updateStatus = async (req, res) => {
   }
 };
 
-// Notification handler for Midtrans payments
-// Function to handle payment notification from Midtrans
 const handleNotification = async (req, res) => {
   try {
     const notification = req.body;
+    console.log("🔔 Notification received:", notification);
 
-    console.log("🔔 Notification received:", notification); // Log notifikasi yang diterima
-
-    // Validasi data yang diterima dari Midtrans
     if (
       !notification.order_id ||
       !notification.transaction_status ||
@@ -233,34 +200,43 @@ const handleNotification = async (req, res) => {
       return res.status(400).send("Invalid notification data");
     }
 
-    const orderId = notification.order_id;
+    const orderId = notification.order_id; // Use order_id from notification
     const transactionStatus = notification.transaction_status;
     const fraudStatus = notification.fraud_status;
 
-    console.log(`Order ID: ${orderId}, Transaction Status: ${transactionStatus}, Fraud Status: ${fraudStatus}`);
+    console.log(
+      `Order ID: ${orderId}, Transaction Status: ${transactionStatus}, Fraud Status: ${fraudStatus}`
+    );
 
-    // Tentukan status pembayaran berdasarkan transaction_status
-    let newStatus = "pending"; // Default status adalah pending
-    if (transactionStatus === "settlement") {
-      newStatus = "paid"; // Pembayaran berhasil
+    let newStatus = "pending"; // Default status
+    let paymentStatus = false; //  Default payment status
+
+    if (transactionStatus === "settlement" || transactionStatus === "capture") {
+      // Handle 'capture' for credit card
+      newStatus = "paid";
+      paymentStatus = true;
     } else if (
       transactionStatus === "cancel" ||
       transactionStatus === "expire" ||
       transactionStatus === "deny"
     ) {
-      newStatus = "failed"; // Pembayaran gagal
+      newStatus = "failed";
+      paymentStatus = false;
+    } else if (transactionStatus === "pending") {
+      newStatus = "pending";
+      paymentStatus = false; // Keep as false for pending
     }
+    // Add more status handling as needed (e.g., 'pending', 'expire')
 
     console.log(`New status to be updated: ${newStatus}`);
 
-    // Update status order di MongoDB
+    // Update order status in MongoDB *using the orderId, NOT the transactionToken*
     const updatedOrder = await orderModel.findOneAndUpdate(
-      { transactionToken: orderId }, // Cari order berdasarkan transactionToken
-      { payment: newStatus === "paid", status: newStatus }, // Update status pembayaran
-      { new: true } // Mengembalikan data yang telah diupdate
+      { orderId: orderId }, //  Use orderId, NOT transactionToken
+      { status: newStatus, payment: paymentStatus }, // Update both status and payment
+      { new: true }
     );
 
-    // Jika order tidak ditemukan, berikan response 404
     if (!updatedOrder) {
       console.error(`Order not found for order ID: ${orderId}`);
       return res.status(404).send("Order not found");
@@ -268,68 +244,17 @@ const handleNotification = async (req, res) => {
 
     console.log("✅ Order updated successfully:", updatedOrder);
 
-    // Berikan respon yang lengkap
-    res.status(200).json({ success: true, message: "OK" });
+    res.status(200).json({ success: true, message: "OK" }); //  Simpler response
   } catch (error) {
     console.error("❌ Error handling notification:", error);
     res.status(500).send("Internal Server Error");
   }
 };
 
-// Success handler for Midtrans payment
-const handleSuccess = async (req, res) => {
-  try {
-    const orderId = req.query.orderId;
-    const transactionStatus = await snap.transaction.status(orderId);
-
-    if (transactionStatus.transaction_status === "settlement") {
-      await orderModel.findOneAndUpdate(
-        { transactionToken: orderId },
-        { payment: true, status: "paid" }
-      );
-      res.redirect("/orders"); // Redirect ke halaman order user
-    } else {
-      await orderModel.findOneAndUpdate(
-        { transactionToken: orderId },
-        { status: transactionStatus.transaction_status }
-      );
-      res.redirect("/pending-or-failure-page");
-    }
-  } catch (error) {
-    console.error("Error handling success:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to process payment" });
-  }
-};
-
-// Failure handler for Midtrans payment
-const handleFailure = async (req, res) => {
-  try {
-    const orderId = req.query.orderId;
-    const transactionStatus = await snap.transaction.status(orderId);
-
-    await orderModel.findOneAndUpdate(
-      { orderId },
-      { status: "Failed", payment: false }
-    );
-    res.redirect("/failure-page");
-  } catch (error) {
-    console.error("Error handling failure:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to process payment" });
-  }
-};
-
-
 export {
-  placeOrder,
   allOrders,
   userOrders,
   updateStatus,
   placeOrderMidtrans,
   handleNotification,
-  handleSuccess,
-  handleFailure,
 };
