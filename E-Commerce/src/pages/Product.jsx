@@ -1,343 +1,401 @@
-import React, {
-  useContext,
-  useEffect,
-  useState,
-  useReducer,
-  useCallback,
-} from "react";
+// Product.js
+import React, { useContext, useEffect, useState, useReducer, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ShopContext } from "../context/ShopContext";
 import RelatedProducts from "../components/RelatedProducts"; // Assuming you have this
-import { Stars, Loader, AlertTriangle } from "lucide-react";
+import { Stars, Loader, AlertTriangle, XCircle } from "lucide-react"; // Import XCircle
+import { toast } from 'react-toastify';
+import {
+    Box,
+    Heading,
+    Text,
+    Image,
+    Flex,
+    Button,
+    Spinner,
+    Badge
+} from '@chakra-ui/react';
 
 const initialState = {
-  productData: null,
-  selectedImage: null,
-  selectedVariant: null,
-  isAddingToCart: false,
-  isLoading: true,
-  error: null,
+    productData: null,
+    selectedImage: null,
+    selectedVariant: {}, // Store as an object: { variantName: selectedOptionName }
+    isAddingToCart: false,
+    isLoading: true,
+    error: null,
 };
 
 const reducer = (state, action) => {
-  switch (action.type) {
-    case "SET_PRODUCT_DATA":
-      return {
-        ...state,
-        productData: action.payload,
-        selectedImage: action.payload?.images?.[0] || null,
-        isLoading: false,
-        error: null,
-      };
-    case "SET_SELECTED_IMAGE":
-      return { ...state, selectedImage: action.payload };
-    case "SET_SELECTED_VARIANT":
-      return { ...state, selectedVariant: action.payload };
-    case "SET_IS_ADDING_TO_CART":
-      return { ...state, isAddingToCart: action.payload };
-    case "SET_LOADING":
-      return { ...state, isLoading: action.payload };
-    case "SET_ERROR":
-      return {
-        ...state,
-        isLoading: false,
-        error: action.payload,
-        productData: null,
-      };
-    default:
-      return state;
-  }
+    switch (action.type) {
+        case "SET_PRODUCT_DATA":
+            return {
+                ...state,
+                productData: action.payload,
+                selectedImage: action.payload?.images?.[0] || null, // Optional chaining
+                selectedVariant: {}, // Reset selected variant when new product loads
+                isLoading: false,
+                error: null,
+            };
+        case "SET_SELECTED_IMAGE":
+            return { ...state, selectedImage: action.payload };
+        case "SET_SELECTED_VARIANT":
+            return {
+                ...state,
+                selectedVariant: {
+                  ...state.selectedVariant,
+                    [action.payload.variantName] : action.payload.optionName
+                }
+            };
+        case "SET_IS_ADDING_TO_CART":
+            return { ...state, isAddingToCart: action.payload };
+        case "SET_LOADING":
+            return { ...state, isLoading: action.payload };
+        case "SET_ERROR":
+            return {
+                ...state,
+                isLoading: false,
+                error: action.payload,
+                productData: null,
+            };
+        case "CLEAR_VARIANT":
+              const newState = { ...state };
+              delete newState.selectedVariant[action.payload]; // Remove the specific variant
+              return newState;
+        default:
+            return state;
+    }
 };
 
 const Product = () => {
-  const { productId } = useParams();
-  const { formatIDR, addToCart, products, categories, subCategories } =
-    useContext(ShopContext);
-  const [state, dispatch] = useReducer(reducer, initialState);
-  const [displayPrice, setDisplayPrice] = useState("Loading..."); // Initialize with "Loading..."
+    const { productId } = useParams();
+    const { formatIDR, addToCart, products, categories, subCategories, backendUrl } =
+        useContext(ShopContext);
+    const [state, dispatch] = useReducer(reducer, initialState);
 
-  useEffect(() => {
-    const fetchProductData = async () => {
-      dispatch({ type: "SET_LOADING", payload: true });
-      try {
-        const product = products.find((p) => p._id === productId);
-        if (product) {
-          dispatch({ type: "SET_PRODUCT_DATA", payload: product });
-        } else {
-          dispatch({ type: "SET_ERROR", payload: "Product not found" });
+    const fetchProductData = useCallback(async () => {
+        dispatch({ type: "SET_LOADING", payload: true });
+        try {
+            const response = await fetch(`${backendUrl}/api/products/${productId}`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const product = await response.json();
+
+            if (product) {
+                 // Initialize selectedVariant based on available options
+                const initialSelectedVariant = {};
+                if(product.variants && product.variants.length > 0) {
+                  product.variants.forEach(variant => {
+                    if(variant.options && variant.options.length > 0){
+                      initialSelectedVariant[variant.variantName] = variant.options[0].optionName;
+                    }
+                  });
+                }
+              dispatch({ type: "SET_PRODUCT_DATA", payload: product });
+              dispatch({type: "SET_SELECTED_VARIANT", payload: initialSelectedVariant})
+            } else {
+                dispatch({ type: "SET_ERROR", payload: "Product not found" });
+            }
+        } catch (error) {
+            console.error("Fetch error:", error);
+            dispatch({ type: "SET_ERROR", payload: `Failed to fetch product: ${error.message}` });
         }
-      } catch (error) {
-        dispatch({ type: "SET_ERROR", payload: "Failed to fetch product" });
-      }
-    };
+    }, [productId, backendUrl]);
 
-    if (products.length > 0) {
-      fetchProductData();
-    }
-  }, [productId, products]);
+    useEffect(() => {
+        fetchProductData();
+    }, [fetchProductData]);
 
-  // --- Calculate Display Price (useCallback) ---
-  const calculateDisplayPrice = useCallback(() => {
-    let priceToDisplay = "";
-
-    if (state.productData) {
-      let price = null; // Simpan harga, bukan minPrice/maxPrice
-
-      // 1. Cek apakah ada varian
-      if (state.productData.variants && state.productData.variants.length > 0) {
-        // Ambil harga dari varian PERTAMA, dan opsi PERTAMA dari varian tersebut
-        if (
-          state.productData.variants[0].options &&
-          state.productData.variants[0].options.length > 0
-        ) {
-          price = state.productData.variants[0].options[0].price;
-        }
-      } else if (state.productData.price != null) {
-        // 2. Jika tidak ada varian, gunakan harga utama produk
-        price = state.productData.price;
+     // --- getOption ---
+    const getOption = (product, variantName, optionName) => {
+      if (!product || !product.variants) {
+        return null;
       }
 
-      // 3. Format harga
-      if (price === null || isNaN(price)) {
-        priceToDisplay = ""; // Jika tidak ada harga, kosongkan
-      } else if (price === 0) {
-        priceToDisplay = "Free";
-      } else {
-        priceToDisplay = formatIDR(price); // Format harga
+      const variant = product.variants.find(v => v.variantName === variantName);
+      if (!variant || !variant.options) {
+        return null;
       }
+      return variant.options.find(o => o.optionName === optionName);
     }
 
-    return priceToDisplay;
-  }, [state.productData, formatIDR]);
 
-  // --- useEffect to Update Display Price ---
-  useEffect(() => {
-    let priceToDisplay = ""; // Initialize
+    const handleVariantChange = useCallback((variantName, optionName) => {
+        dispatch({
+            type: "SET_SELECTED_VARIANT",
+            payload: { variantName, optionName },
+        });
+    }, []);
 
-    if (state.selectedVariant) {
-      // If a variant IS selected, use its price directly.
-      priceToDisplay = formatIDR(state.selectedVariant.optionPrice);
-    } else {
-      // If NO variant is selected (either no variants or not selected), calculate.
-      priceToDisplay = calculateDisplayPrice();
-    }
 
-    setDisplayPrice(priceToDisplay);
-  }, [state.productData, state.selectedVariant, calculateDisplayPrice]);
-  const handleVariantChange = useCallback((variantName, option, variantId) => {
-    dispatch({
-      type: "SET_SELECTED_VARIANT",
-      payload: {
-        variantName,
-        optionId: option._id,
-        variantId,
-        optionName: option.name,
-        optionPrice: option.price,
-      },
-    });
-  }, []);
+    const handleAddToCart = useCallback(async () => {
+        if (!state.productData) return;
 
-  const handleAddToCart = useCallback(async () => {
-    if (!state.productData) return;
+        dispatch({ type: "SET_IS_ADDING_TO_CART", payload: true });
+        try {
+            const selectedVariants = [];
+            // Iterate through the selectedVariant object
+            for (const variantName in state.selectedVariant) {
+              if(state.selectedVariant.hasOwnProperty(variantName)) {
+                const optionName = state.selectedVariant[variantName];
 
-    dispatch({ type: "SET_IS_ADDING_TO_CART", payload: true });
-    try {
-      let variantId = null;
-      let optionId = null;
-      if (state.selectedVariant) {
-        variantId = state.selectedVariant.variantId;
-        optionId = state.selectedVariant.optionId;
-      }
-      await addToCart(state.productData._id, variantId, optionId, 1);
-    } catch (error) {
-      console.error("Error adding to cart", error);
-    } finally {
-      dispatch({ type: "SET_IS_ADDING_TO_CART", payload: false });
-    }
-  }, [state.productData, state.selectedVariant, addToCart]);
-
-  if (state.isLoading) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <Loader className="animate-spin h-10 w-10 text-gray-500" />
-      </div>
-    );
-  }
-
-  if (state.error) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <AlertTriangle className="h-10 w-10 text-red-500 mr-2" />
-        <p>{state.error}</p>
-      </div>
-    );
-  }
-
-  if (!state.productData) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <p>Product data not available.</p>
-      </div>
-    );
-  }
-
-  const category = categories.find(
-    (cat) => cat._id === state.productData.category
-  );
-  const categoryName = category ? category.name : "Unknown Category";
-
-  const subCategory = subCategories.find(
-    (subCat) => subCat._id === state.productData.subCategory
-  );
-  const subCategoryName = subCategory ? subCategory.name : "";
-
-  return (
-    <section className="py-12 bg-gray-50">
-      <div className="container mx-auto px-4">
-        <div className="flex flex-col md:flex-row gap-12">
-          {/* Product Images */}
-          <div className="md:w-1/2 flex flex-col md:flex-row gap-4">
-            <div className="md:w-1/4 flex md:flex-col gap-2 overflow-auto">
-              {state.productData.images.map((item, index) => (
-                <img
-                  key={index}
-                  onClick={() =>
-                    dispatch({
-                      type: "SET_SELECTED_IMAGE",
-                      payload: item,
-                    })
+                const selectedOption = getOption(state.productData, variantName, optionName)
+                if(!selectedOption){
+                   console.error(`Option "${optionName}" for variant "${variantName}" not found.`);
+                   toast.error(`Option "${optionName}" for variant "${variantName}" not found.`); // Show a toast message
+                  return; // Exit the function. Don't add to cart
+                }
+                selectedVariants.push({
+                  variantName: variantName,
+                  selectedOption: {
+                     optionName: selectedOption.optionName, // Or just optionName if that's what you store
+                    _id: selectedOption._id
                   }
-                  src={item}
-                  className={`cursor-pointer w-full md:w-full rounded-md ${
-                    state.selectedImage === item
-                      ? "border-2 border-blue-500"
-                      : "border border-gray-300"
-                  } hover:border-blue-500 transition-colors`}
-                  alt={`Thumbnail ${index + 1}`}
-                />
-              ))}
-            </div>
-            <div className="md:w-3/4">
-              <img
-                className="w-full h-auto rounded-lg"
-                src={state.selectedImage}
-                alt={state.productData.name}
-              />
-            </div>
-          </div>
+                });
+              }
+            }
 
-          {/* Product Details */}
-          <div className="md:w-1/2">
-            <h1 className="text-3xl font-semibold mb-2">
-              {state.productData.name}
-            </h1>
-            {/* Rating Stars */}
-            <div className="flex items-center mb-4">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Stars
-                  key={i}
-                  className={`w-5 h-5 ${
-                    i < Math.floor(state.productData.rating || 0)
-                      ? "text-yellow-400"
-                      : "text-gray-300"
-                  }`}
-                />
-              ))}
-              <span className="ml-2 text-sm text-gray-500">
-                ({state.productData.rating || 0})
-              </span>
-            </div>
+            // Now, pass selectedVariants array
 
-            {/* Display Price */}
-            <p className="text-xl font-bold text-gray-900 mb-4">
-              {displayPrice} {/* Use the calculated displayPrice */}
-            </p>
-            <p className="text-gray-600 mb-2">
-              <span className="font-semibold">Category: </span>
-              {categoryName}
-            </p>
-            {subCategoryName && (
-              <p className="text-gray-600 mb-4">
-                <span className="font-semibold">Subcategory: </span>
-                {subCategoryName}
-              </p>
-            )}
+            await addToCart(state.productData._id, selectedVariants, 1);  // Pass selectedVariants
+            toast.success('Product added to cart!'); // Show success toast
+        } catch (error) {
+             toast.error(error.message || "Error adding to cart"); // Use error message
+            console.error("Error adding to cart", error);
 
-            {/* Product Description */}
-            <p className="text-gray-700 mb-6 whitespace-pre-line">
-              {state.productData.description}
-            </p>
+        } finally {
+            dispatch({ type: "SET_IS_ADDING_TO_CART", payload: false });
+        }
+    }, [state.productData, state.selectedVariant, addToCart, getOption]);
 
-            {state.productData.variants?.length > 0 && (
-              <div className="mb-6">
-                <p className="font-semibold text-gray-700 mb-2">Varian</p>
-                {state.productData.variants.map((variant) => (
-                  <div key={variant._id} className="mb-4">
-                    <p className="text-gray-700 mb-2">{variant.name}</p>
-                    {/* Horizontal scrolling container */}
-                    <div className="overflow-x-auto whitespace-nowrap py-2">
-                      {/* Add padding to the container */}
-                      <div className="inline-block">
-                        {" "}
-                        {/* Add this for correct scrolling */}
-                        {variant.options.map((option) => (
-                          <button
-                            key={option._id}
-                            onClick={() =>
-                              handleVariantChange(
-                                variant.name,
-                                option,
-                                variant._id
-                              )
-                            }
-                            className={`px-4 py-2 border rounded-md text-sm font-medium inline-block mr-2 last:mr-0 ${
-                              /* Add inline-block and margin */
-                              state.selectedVariant?.variantId ===
-                                variant._id &&
-                              state.selectedVariant?.optionId === option._id
-                                ? "border-blue-500 bg-blue-100 text-blue-600"
-                                : "border-gray-300 hover:bg-gray-100 text-gray-700"
-                            } transition-colors whitespace-nowrap`} /* Add whitespace-nowrap */
-                          >
-                            {option.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
 
-            {/* Add to Cart Button */}
-            <button
-              onClick={handleAddToCart}
-              disabled={state.isAddingToCart}
-              className={`w-full px-6 py-3 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold transition duration-200 ${
-                state.isAddingToCart ? "opacity-50 cursor-not-allowed" : ""
-              }`}
-            >
-              {state.isAddingToCart ? (
-                <>
-                  <Loader className="animate-spin h-5 w-5 inline-block mr-2" />
-                  Adding...
-                </>
-              ) : (
-                "Add to Cart"
-              )}
-            </button>
 
-            {/* Back to Collection Link */}
-            <div className="mt-4 text-center">
-              <Link to="/collection" className="text-blue-600 hover:underline">
-                &larr; Back to Collection
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
+
+    if (state.isLoading) {
+        return (
+            <Flex justify="center" align="center" h="50vh">
+                <Spinner size="xl" />
+            </Flex>
+        );
+    }
+
+    if (state.error) {
+        return (
+            <Flex justify="center" align="center" h="50vh" direction="column">
+                <AlertTriangle className="h-10 w-10 text-red-500" />
+                <Text mt={2}>{state.error}</Text>
+            </Flex>
+        );
+    }
+
+    if (!state.productData) {
+        return (
+            <Flex justify="center" align="center" h="50vh">
+                <Text>Product data not available.</Text>
+            </Flex>
+        );
+    }
+
+  const category = categories.find((cat) => cat._id === state.productData.category);
+    const categoryName = category ? category.name : "Unknown Category";
+
+    const subCategory = subCategories.find(
+        (subCat) => subCat._id === state.productData.subCategory
+    );
+    const subCategoryName = subCategory ? subCategory.name : "";
+
+    return (
+        <Box as="section" py="12" bg="gray.50">
+            <Box maxW="7xl" mx="auto" px={4}>
+                <Flex
+                    direction={{ base: "column", md: "row" }}
+                    gap={{ base: 8, md: 12 }}
+                >
+                    {/* Product Images */}
+                    <Box flex={{ base: "1", md: "1" }} display="flex" flexDirection={{base: 'column', md: 'row'}} gap={{base: '2', md: '4'}}>
+                        <Box  display='flex' flexDirection={{base: 'row', md: 'column'}} gap={{base: 2, md: 4}} overflow='auto' w={{base: 'full', md: '25%'}}>
+                            {state.productData.images.map((item, index) => (
+                                <Image
+                                    key={index}
+                                    onClick={() =>
+                                        dispatch({
+                                            type: "SET_SELECTED_IMAGE",
+                                            payload: item,
+                                        })
+                                    }
+                                    src={item}
+                                    cursor="pointer"
+                                    w="full"
+                                    rounded="md"
+                                    borderWidth={state.selectedImage === item ? "2px" : "1px"}
+                                    borderColor={
+                                        state.selectedImage === item ? "blue.500" : "gray.300"
+                                    }
+                                    _hover={{ borderColor: "blue.500" }}
+                                    transition="border-color 0.2s"
+                                    alt={`Thumbnail ${index + 1}`}
+                                     maxH={{base: '70px', md: 'full'}} // Added max height
+                                />
+                            ))}
+                        </Box>
+                        <Box flex="1">
+                            <Image
+                                w="full"
+                                h="auto"
+                                rounded="lg"
+                                src={state.selectedImage}
+                                alt={state.productData.name}
+                            />
+                        </Box>
+                    </Box>
+
+                    {/* Product Details */}
+                    <Box flex={{ base: "1", md: "1" }}>
+                        <Heading as="h1" size="xl" mb={2}>
+                            {state.productData.name}
+                        </Heading>
+                        {/* Rating Stars */}
+                        <Flex align="center" mb={4}>
+                            {Array.from({ length: 5 }).map((_, i) => (
+                                <Stars
+                                    key={i}
+                                    className={`w-5 h-5 ${
+                                        i < Math.floor(state.productData.rating || 0)
+                                            ? "text-yellow-400"
+                                            : "text-gray-300"
+                                    }`}
+                                />
+                            ))}
+                            <Text ml={2} fontSize="sm" color="gray.500">
+                                ({state.productData.rating || 0})
+                            </Text>
+                        </Flex>
+                        <Text fontSize="xl" fontWeight="bold" color="gray.900" mb={4}>
+                          {state.productData.price
+                            ? formatIDR(state.productData.price)
+                            : "Price Not Available"}
+                        </Text>
+                        {/* Display stock information */}
+                        <Text color={state.productData.stock > 0 ? 'green.500' : 'red.500'} fontWeight="semibold" mb={2}>
+                            {state.productData.stock > 0 ? `In Stock: ${state.productData.stock}` : 'Out of Stock'}
+                        </Text>
+                        <Text color="gray.600" mb={2}>
+                            <Text as="span" fontWeight="semibold">
+                                Category:{" "}
+                            </Text>
+                            {categoryName}
+                        </Text>
+                        {subCategoryName && (
+                            <Text color="gray.600" mb={4}>
+                                <Text as="span" fontWeight="semibold">
+                                    Subcategory:{" "}
+                                </Text>
+                                {subCategoryName}
+                            </Text>
+                        )}
+
+                        {/* Product Description */}
+                        <Text whiteSpace="pre-line" color="gray.700" mb={6}>
+                            {state.productData.description}
+                        </Text>
+                        {/*Variant */}
+                        {state.productData.variants?.length > 0 && (
+                                                    <Box mb={6}>
+                                                        <Text fontWeight="semibold" color="gray.700" mb={2}>
+                                                            Variants
+                                                        </Text>
+                                                        {state.productData.variants.map((variant) => (
+                                                            <Box key={variant._id} mb={4}>
+                                                                <Flex alignItems="center">
+                                                                    <Text color="gray.700" mb={1} fontWeight="semibold" mr={2}>
+                                                                        {variant.variantName}:
+                                                                    </Text>
+                                                                    {/* Display selected option */}
+                                                                  {state.selectedVariant[variant.variantName] && (
+                                                                    <Badge colorScheme="blue" mr={2} mb={1}>
+                                                                      {state.selectedVariant[variant.variantName]}
+                                                                    </Badge>
+
+                                                                    )}
+                                                                  {/* Button to Clear selection */}
+                                                                    {state.selectedVariant[variant.variantName] && (
+                                                                        <Button
+                                                                        size="xs"
+                                                                        variant="outline"
+                                                                        colorScheme="gray"
+                                                                        onClick={() => dispatch({ type: "CLEAR_VARIANT", payload: variant.variantName })}
+                                                                          ml={2}
+                                                                          mb={1}
+                                                                        >
+                                                                         <XCircle size={16} className="mr-1" />
+                                                                          Clear
+                                                                        </Button>
+                                                                      )}
+                                                                </Flex>
+                                                                 {/* Options as Badges */}
+                                                                <Box>
+
+                                                                <Flex flexWrap="wrap" >
+                                                                   {variant.options.map((option) => {
+                                                                     const isSelected = state.selectedVariant[variant.variantName] === option.optionName;
+                                                                        return (
+                                                                          <Button
+                                                                          key={option._id}
+                                                                            onClick={() => handleVariantChange(variant.variantName, option.optionName)}
+                                                                              size="sm"
+                                                                              variant={isSelected ? "solid" : "outline"}
+                                                                              colorScheme={isSelected ? "blue" : "gray"}
+                                                                            mr={2}
+                                                                            mb={2}
+                                                                              isDisabled={option.stock <= 0} // Disable if out of stock
+                                                                          >
+
+                                                                              {option.optionName}
+                                                                              {/* Show stock */}
+                                                                                <Badge ml={1} colorScheme={option.stock > 0 ? 'green' : 'red'}>
+                                                                                {option.stock > 0 ? `${option.stock} In Stock` : 'Out of Stock'}
+                                                                              </Badge>
+
+                                                                          </Button>
+                                                                      )
+                                                                   })}
+                                                                  </Flex>
+                                                                </Box>
+                                                            </Box>
+                                                        ))}
+                                                    </Box>
+                                                )}
+
+
+                        {/* Add to Cart Button */}
+                        <Button
+                            onClick={handleAddToCart}
+                            isDisabled={state.isAddingToCart}
+                            colorScheme="blue"
+                            size="lg"
+                            w="full"
+                            py={6}
+                            rounded="full"
+                            isLoading={state.isAddingToCart}
+                            loadingText="Adding..."
+                        >
+                            Add to Cart
+                        </Button>
+
+                        {/* Back to Collection Link */}
+                        <Box mt={4} textAlign="center">
+                            <Link
+                                to="/collection"
+                                className="text-blue-600 hover:underline"
+                            >
+                                &larr; Back to Collection
+                            </Link>
+                        </Box>
+                    </Box>
+                </Flex>
+            </Box>
+        </Box>
+    );
 };
 
 export default Product;
