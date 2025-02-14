@@ -21,7 +21,7 @@ const createOrder = async (
   paymentMethod,
   ongkir,
   transactionToken = null, // Optional, only for Midtrans
-  order_id = shortUUID // Optional, but GOOD to include for consistency
+  order_id = uuidv4()
 ) => {
   try {
     const orderData = {
@@ -67,7 +67,7 @@ const placeOrderMidtrans = async (req, res) => {
       name: item.name || "Unnamed Product", // Handle potential missing names
     }));
 
-    const ongkir_id = shortUUID; // Use a UUID for the shipping cost item ID
+    const ongkir_id = uuidv4() // Use a UUID for the shipping cost item ID
     item_details.push({
       id: ongkir_id, //It can be anything
       price: ongkir,
@@ -81,7 +81,7 @@ const placeOrderMidtrans = async (req, res) => {
       0
     );
     // Generate a unique order ID *without* any prefixes
-    const order_id = shortUUID; //  <--  IMPORTANT:  Use a plain UUID
+    const order_id = uuidv4(); //  <--  IMPORTANT:  Use a plain UUID
 
     // Create Midtrans transaction parameters
     const parameter = {
