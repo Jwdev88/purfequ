@@ -282,154 +282,221 @@ const Orders = () => {
 
   return (
     <Box p={4} overflowX="auto">
-        <Heading as="h1" size="xl" mb={6} textAlign={{ base: "center", md: "left" }}>
-            Admin Order Management
-        </Heading>
-        {orderData.length > 0 ? (
-            <TableContainer>
-                <Table variant="striped" colorScheme="gray">
-                    <Thead>
-                        <Tr>
-                            <Th>Order ID</Th>
-                            <Th>Status</Th>
-                            <Th>Payment Info</Th>
-                            <Th>Total</Th>
-                            <Th>Date</Th>
-                            <Th>Address</Th>
-                            <Th>Items</Th>
-                            <Th>Notes</Th>
-                            <Th>Tracking #</Th>
-                            <Th>Actions</Th>
-                        </Tr>
-                    </Thead>
-                    <Tbody>
-                        {orderData.map((order) => {
-                            const { icon, color } = getStatusIconAndColor(order.status);
-                            return (
-                                <Tr key={order._id} _hover={{ bg: "gray.100" }}>
-                                    <Td>{order.orderId || order._id}</Td>
-                                    <Td>
-                                        {editOrderId === order.orderId ? (
-                                            <Select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} size="sm">
-                                                <option value="">Select Status</option>
-                                                <option value="Order Received">Order Received</option>
-                                                <option value="Packing">Packing</option>
-                                                <option value="In Transit">In Transit</option>
-                                                <option value="Delivered">Delivered</option>
-                                                <option value="Failed">Failed</option>
-                                                <option value="Pending">Pending</option>
-                                                <option value="Paid">Paid</option>
-                                            </Select>
-                                        ) : (
-                                            <HStack>
-                                                {icon}
-                                                <Text color={color} fontWeight="bold">{order.status}</Text>
-                                            </HStack>
-                                        )}
-                                    </Td>
-                                    <Td>
-                                        <Text>Type: {order.paymentType || '-'}</Text>
-                                        {order.vaNumber && <Text>VA: {order.bank.toUpperCase()} - {order.vaNumber}</Text>}
-                                    </Td>
-                                    <Td>{formatIDR(calculateTotal(order.items, order.ongkir))}</Td>
-                                    <Td>{new Date(order.date).toLocaleDateString()}</Td>
-                                    <Td>
-                                        <Box>
-                                            <Text fontWeight="bold">{order.address.firstName} {order.address.lastName}</Text>
-                                            <Text>{order.address.phone}</Text>
-                                            <Text>{order.address.address}, {order.address.cityId}, {order.address.state}</Text>
-                                        </Box>
-                                    </Td>
-                                    <Td>
-                                        <Accordion allowToggle>
-                                            <AccordionItem>
-                                                <AccordionButton>
-                                                    <Box flex='1' textAlign='left'>Show Items</Box>
-                                                    <AccordionIcon />
-                                                </AccordionButton>
-                                                <AccordionPanel pb={4}>
-                                                    {order.items.map((item, index) => (
-                                                        <HStack key={index} p={2} borderRadius="md" spacing={4} alignItems="center">
-                                                            <Image src={item.image} alt={item.name} boxSize="50px" objectFit="cover" borderRadius="md" />
-                                                            <Box>
-                                                                <Text fontWeight="bold">{item.name}</Text>
-                                                                <Text>Qty: {item.quantity}</Text>
-                                                                <Text>Price: {formatIDR(item.price)}</Text>
-                                                            </Box>
-                                                        </HStack>
-                                                    ))}
-                                                </AccordionPanel>
-                                            </AccordionItem>
-                                        </Accordion>
-                                    </Td>
-                                    <Td w="250px">
-    {editOrderId === order.orderId ? (
-        <Input
-            value={editNotes}
-            onChange={(e) => setEditNotes(e.target.value)}
-            size="sm"
-            w="full"
-            minW="200px"
-            maxW="300px"
-            whiteSpace="nowrap"
-            overflow="hidden"
-            textOverflow="ellipsis"
-            borderRadius="md"
-            p={2}
-        />
-    ) : (
-        <Text whiteSpace="nowrap" overflow="hidden" textOverflow="ellipsis">
-            {order.notes || '-'}
-        </Text>
-    )}
-</Td>
+      <Heading
+        as="h1"
+        size="xl"
+        mb={6}
+        textAlign={{ base: "center", md: "left" }}
+      >
+        Admin Order Management
+      </Heading>
+      {orderData.length > 0 ? (
+        <TableContainer>
+          <Table variant="striped" colorScheme="gray">
+            <Thead>
+              <Tr>
+                <Th>Order ID</Th>
+                <Th>Status</Th>
+                <Th>Payment Info</Th>
+                <Th>Total</Th>
+                <Th>Date</Th>
+                <Th>Address</Th>
+                <Th>Items</Th>
+                <Th>Notes</Th>
+                <Th>Tracking #</Th>
+                <Th>Actions</Th>
+              </Tr>
+            </Thead>
+            <Tbody>
+              {orderData.map((order) => {
+                const { icon, color } = getStatusIconAndColor(order.status);
+                return (
+                  <Tr key={order._id} _hover={{ bg: "gray.100" }}>
+                    <Td>{order.orderId || order._id}</Td>
+                    <Td>
+                      {editOrderId === order.orderId ? (
+                        <Select
+                          value={editStatus}
+                          onChange={(e) => setEditStatus(e.target.value)}
+                          size="sm"
+                        >
+                          <option value="">Select Status</option>
+                          <option value="Order Received">Order Received</option>
+                          <option value="Packing">Packing</option>
+                          <option value="In Transit">In Transit</option>
+                          <option value="Delivered">Delivered</option>
+                          <option value="Failed">Failed</option>
+                          <option value="Pending">Pending</option>
+                          <option value="Paid">Paid</option>
+                        </Select>
+                      ) : (
+                        <HStack>
+                          {icon}
+                          <Text color={color} fontWeight="bold">
+                            {order.status}
+                          </Text>
+                        </HStack>
+                      )}
+                    </Td>
+                    <Td>
+                      <Text>Type: {order.paymentType || "-"}</Text>
+                      {order.vaNumber && (
+                        <Text>
+                          VA: {order.bank.toUpperCase()} - {order.vaNumber}
+                        </Text>
+                      )}
+                    </Td>
+                    <Td>
+                      {formatIDR(calculateTotal(order.items, order.ongkir))}
+                    </Td>
+                    <Td>{new Date(order.date).toLocaleDateString()}</Td>
+                    <Td>
+                      <Box>
+                        <Text fontWeight="bold">
+                          {order.address.firstName} {order.address.lastName}
+                        </Text>
+                        <Text>{order.address.phone}</Text>
+                        <Text>
+                          {order.address.address}, {order.address.cityId},{" "}
+                          {order.address.state}
+                        </Text>
+                      </Box>
+                    </Td>
+                    <Td>
+                      <Accordion allowToggle>
+                        <AccordionItem>
+                          <AccordionButton>
+                            <Box flex="1" textAlign="left">
+                              Show Items
+                            </Box>
+                            <AccordionIcon />
+                          </AccordionButton>
+                          <AccordionPanel pb={4}>
+                            {order.items.map((item, index) => (
+                              <HStack
+                                key={index}
+                                p={2}
+                                borderRadius="md"
+                                spacing={4}
+                                alignItems="center"
+                              >
+                                <Image
+                                  src={item.image}
+                                  alt={item.name}
+                                  boxSize="50px"
+                                  objectFit="cover"
+                                  borderRadius="md"
+                                />
+                                <Box>
+                                  <Text fontWeight="bold">{item.name}</Text>
+                                  <Text>Qty: {item.quantity}</Text>
+                                  <Text>Price: {formatIDR(item.price)}</Text>
+                                </Box>
+                              </HStack>
+                            ))}
+                          </AccordionPanel>
+                        </AccordionItem>
+                      </Accordion>
+                    </Td>
+                    <Td w="250px">
+                      {editOrderId === order.orderId ? (
+                        <Input
+                          value={editNotes}
+                          onChange={(e) => setEditNotes(e.target.value)}
+                          size="sm"
+                          w="full"
+                          minW="200px"
+                          maxW="300px"
+                          whiteSpace="nowrap"
+                          overflow="hidden"
+                          textOverflow="ellipsis"
+                          borderRadius="md"
+                          p={2}
+                        />
+                      ) : (
+                        <Text
+                          whiteSpace="nowrap"
+                          overflow="hidden"
+                          textOverflow="ellipsis"
+                        >
+                          {order.notes || "-"}
+                        </Text>
+                      )}
+                    </Td>
 
-<Td w="200px">
-    {editOrderId === order.orderId ? (
-        <Input
-            type="text"
-            value={editTrackingNumber}
-            onChange={(e) => setEditTrackingNumber(e.target.value)}
-            size="sm"
-            w="full"
-            minW="150px"
-            maxW="250px"
-            whiteSpace="nowrap"
-            overflow="hidden"
-            textOverflow="ellipsis"
-            borderRadius="md"
-            p={2}
-        />
-    ) : (
-        <Text whiteSpace="nowrap" overflow="hidden" textOverflow="ellipsis">
-            {order.trackingNumber || '-'}
+                    <Td w="200px">
+                      {editOrderId === order.orderId ? (
+                        <Input
+                          type="text"
+                          value={editTrackingNumber}
+                          onChange={(e) =>
+                            setEditTrackingNumber(e.target.value)
+                          }
+                          size="sm"
+                          w="full"
+                          minW="150px"
+                          maxW="250px"
+                          whiteSpace="nowrap"
+                          overflow="hidden"
+                          textOverflow="ellipsis"
+                          borderRadius="md"
+                          p={2}
+                        />
+                      ) : (
+                        <Text
+                          whiteSpace="nowrap"
+                          overflow="hidden"
+                          textOverflow="ellipsis"
+                        >
+                          {order.trackingNumber || "-"}
+                        </Text>
+                      )}
+                    </Td>
+                    <Td>
+                      <HStack spacing={2} wrap="wrap">
+                        {editOrderId === order.orderId ? (
+                          <>
+                            <Button
+                              onClick={handleUpdateStatus}
+                              isLoading={isUpdating}
+                              colorScheme="blue"
+                              size="sm"
+                            >
+                              Save
+                            </Button>
+                            <Button
+                              onClick={handleCancelEdit}
+                              colorScheme="gray"
+                              size="sm"
+                            >
+                              Cancel
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            onClick={() => handleEdit(order)}
+                            colorScheme="yellow"
+                            size="sm"
+                            leftIcon={<Edit />}
+                          >
+                            Edit
+                          </Button>
+                        )}
+                      </HStack>
+                    </Td>
+                  </Tr>
+                );
+              })}
+            </Tbody>
+          </Table>
+        </TableContainer>
+      ) : (
+        <Text textAlign="center" fontSize="xl">
+          No orders found.
         </Text>
-    )}
-</Td>
-                                   <Td>
-                                        <HStack spacing={2} wrap="wrap">
-                                            {editOrderId === order.orderId ? (
-                                                <>
-                                                    <Button onClick={handleUpdateStatus} isLoading={isUpdating} colorScheme="blue" size="sm">Save</Button>
-                                                    <Button onClick={handleCancelEdit} colorScheme="gray" size="sm">Cancel</Button>
-                                                </>
-                                            ) : (
-                                                <Button onClick={() => handleEdit(order)} colorScheme="yellow" size="sm" leftIcon={<Edit />}>Edit</Button>
-                                            )}
-                                        </HStack>
-                                    </Td>
-                                </Tr>
-                            );
-                        })}
-                    </Tbody>
-                </Table>
-            </TableContainer>
-        ) : (
-            <Text textAlign="center" fontSize="xl">No orders found.</Text>
-        )}
+      )}
     </Box>
-);
-
+  );
 };
 
 export default Orders;
