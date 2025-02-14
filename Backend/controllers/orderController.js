@@ -3,6 +3,7 @@ import orderModel from "../models/ordermodel.js";
 import UserModel from "../models/userModel.js";
 import midtransClient from "midtrans-client";
 import { v4 as uuidv4 } from "uuid";
+const shortUUID = uuidv4().replace(/-/g, "").slice(0, 15);
 
 // Initialize Snap (for creating transactions).  Use environment variables!
 let snap = new midtransClient.Snap({
@@ -20,7 +21,7 @@ const createOrder = async (
   paymentMethod,
   ongkir,
   transactionToken = null, // Optional, only for Midtrans
-  order_id = null // Optional, but GOOD to include for consistency
+  order_id = shortUUID // Optional, but GOOD to include for consistency
 ) => {
   try {
     const orderData = {
@@ -65,7 +66,6 @@ const placeOrderMidtrans = async (req, res) => {
       quantity: item.quantity,
       name: item.name || "Unnamed Product", // Handle potential missing names
     }));
-    const shortUUID = uuidv4().replace(/-/g, "").slice(0, 15);
 
     const ongkir_id = shortUUID; // Use a UUID for the shipping cost item ID
     item_details.push({
