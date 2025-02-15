@@ -348,14 +348,15 @@ const Product = () => {
             >
                 Beli Langsung
             </button>
-            </div>
-            
-
             <div className="mt-4 text-center">
               <Link to="/collection" className="text-blue-600 hover:underline">
                 &larr; Back to Collection
               </Link>
             </div>
+            </div>
+            
+
+ 
           </div>
         </div>
       </div>
