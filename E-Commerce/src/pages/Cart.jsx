@@ -2,7 +2,6 @@
 import React, { useContext, useMemo, useState, useCallback, useEffect } from "react"; // Tambah useState, useCallback
 import { ShopContext } from "../context/ShopContext";
 import Title from "../components/Title";
-import CartTotal from "../components/CartTotal";
 import { useCart } from "../hooks/useCart";
 import { CheckCircle2 } from 'lucide-react';
 
