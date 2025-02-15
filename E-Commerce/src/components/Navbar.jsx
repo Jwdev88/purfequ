@@ -18,7 +18,7 @@ const reducer = (state, action) => {
 
 const Navbar = () => {
     const [state, dispatch] = useReducer(reducer, initialState);
-    const { toggleShowSearch, navigate, token, setToken, getCountCart, dispatch: globalDispatch, setSearch } = useContext(ShopContext); // Added setSearch
+    const { toggleShowSearch, navigate, token, setToken, getCountCart, dispatch: globalDispatch, setSearch } = useContext(ShopContext);
     const location = useLocation();
     const sidebarRef = useRef(null);
 
@@ -80,20 +80,39 @@ const Navbar = () => {
                     </button>
 
                     <div className="relative group">
-                        <button onClick={() => token ? null : navigate('/login')} aria-label="Profile" className="hover:text-gray-900 transition-colors">
-                            <User className="w-5 h-5" /> {/* Consistent Icon */}
+                        <button 
+                            onClick={() => token ? null : navigate('/login')} 
+                            aria-label="Profile" 
+                            className="hover:text-gray-900 transition-colors"
+                        >
+                            <User className="w-5 h-5" />
                         </button>
                         {token && (
-                            <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg py-2 z-10 hidden group-hover:block">
-                                <Link to="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">My Profile</Link>
-                                <Link to="/orders" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Orders</Link>
-                                <button onClick={logout} className="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100 w-full text-left">Logout</button>
+                            <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg py-2 z-10 opacity-0 group-hover:opacity-100 group-hover:visible transition-opacity duration-300 ease-in-out">
+                                <Link 
+                                    to="/profile" 
+                                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                >
+                                    My Profile
+                                </Link>
+                                <Link 
+                                    to="/orders" 
+                                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                >
+                                    Orders
+                                </Link>
+                                <button 
+                                    onClick={logout} 
+                                    className="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100 w-full text-left"
+                                >
+                                    Logout
+                                </button>
                             </div>
                         )}
                     </div>
 
                     <Link to="/cart" className="relative hover:text-gray-900 transition-colors" aria-label="Cart">
-                        <ShoppingCart className="w-5 h-5" /> {/* Consistent Icon */}
+                        <ShoppingCart className="w-5 h-5" />
                         <span className="absolute right-[-8px] top-[-8px] w-4 h-4 bg-blue-600 text-white rounded-full text-[10px] flex items-center justify-center">
                             {getCountCart()}
                         </span>

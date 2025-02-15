@@ -187,31 +187,37 @@ const getProducts = async (req, res) => {
       .json({ success: false, message: "Gagal memuat data produk" });
   }
 };
+// backend/controllers/productController.js
 const getProductById = async (req, res) => {
   try {
     const { Id } = req.params;
+    console.log("getProductById - Id:", Id);
+
     if (!Id || !mongoose.Types.ObjectId.isValid(Id)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "ID produk tidak valid" });
+      return res.status(400).json({ success: false, message: "ID produk tidak valid" });
     }
 
     const product = await Product.findById(Id)
-      .populate("category subCategory")
-      .populate("variants.options");
+      .populate("category", "name") // Populate ONLY the 'name' field
+      .populate("subCategory", "name") // Populate ONLY the 'name' field
+      .populate({
+        path: "variants.options", // Populate options within variants
+        select: "name price stock sku weight optionName", // Select only necessary fields
+      });
+
+
+    console.log("getProductById - product:", product);
 
     if (!product) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Produk tidak ditemukan" });
+      return res.status(404).json({ success: false, message: "Produk tidak ditemukan" });
     }
 
-    res.json({ success: true, product });
+    // ALWAYS return an object with a success flag:
+    res.status(200).json({ success: true, product }); // 200 OK
   } catch (error) {
     console.error("Error retrieving product:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Terjadi kesalahan server" });
+     // ALWAYS return a JSON response, even on error:
+    res.status(500).json({ success: false, message: "Terjadi kesalahan server", error: error.message });
   }
 };
 const deleteProduct = async (req, res) => {

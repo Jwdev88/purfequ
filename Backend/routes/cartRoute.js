@@ -1,6 +1,6 @@
 import express  from "express";
 
-import { getUserCart, addToCart, updateCart, clearCart } from "../controllers/cartController.js";
+import { getUserCart, addToCart, updateCart, clearCart,removeItemsFromCart } from "../controllers/cartController.js";
 import authUser from "../middleware/Auth.js";
 
 const cartRouter = express.Router();
@@ -10,6 +10,8 @@ cartRouter.get('/get',authUser, getUserCart);
 cartRouter.post('/add',authUser, addToCart);
 cartRouter.post('/update',authUser, updateCart);
 cartRouter.post('/clear',authUser, clearCart);
+cartRouter.post('/remove-items',authUser, removeItemsFromCart);
+
 
 
 export default cartRouter;

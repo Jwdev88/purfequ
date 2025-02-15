@@ -1,48 +1,50 @@
+// backend/controllers/userController.js
 import validator from "validator";
 import bcrypt from "bcrypt";
 import userModel from "../models/userModel.js";
 import jwt from "jsonwebtoken";
 
-// --- Fungsi-fungsi Helper ---
+// --- Helper Functions ---
 const createToken = (id) => {
-  return jwt.sign({ userId: id }, process.env.JWT_SECRET, { expiresIn: "1d" }); // Sertakan userId di payload
+  return jwt.sign({ userId: id }, process.env.JWT_SECRET, { expiresIn: "1d" });
 };
 
-
-// --- Middleware untuk mendapatkan user dari token ---
+// --- Get User from Token (Middleware - Keep this!) ---
 export const getUserFromToken = async (req, res, next) => {
-    const token = req.headers.authorization?.split(' ')[1]; // "Bearer TOKEN"
+  const token = req.headers.authorization?.split(' ')[1]; // "Bearer TOKEN"
 
-    if (!token) {
-        return res.status(401).json({ message: 'Unauthorized: No token provided' });
+  if (!token) {
+    return res.status(401).json({ message: 'Unauthorized: No token provided' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await userModel.findById(decoded.userId);  // Use decoded.userId
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
 
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const user = await userModel.findById(decoded.userId);
-
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        req.user = user;
-        req.userId = decoded.userId;// Simpan user dan userId di request object
-        next();
-    } catch (error) {
-        console.error(error);
-         if (error.name === 'TokenExpiredError') {
-            return res.status(401).json({ message: 'Unauthorized: Token expired' });
-        }
-        return res.status(401).json({ message: 'Unauthorized: Invalid token' });
-    }
+    req.user = user;
+    req.userId = decoded.userId; // Set userId  <-- IMPORTANT
+    next();
+  } catch (error) {
+    console.error(error); // Log the error for debugging
+      if (error.name === 'TokenExpiredError') {
+        return res.status(401).json({ message: 'Unauthorized: Token expired' });
+      }
+    return res.status(401).json({ message: 'Unauthorized: Invalid token' });
+  }
 };
 
-// --- Fungsi-fungsi CRUD Profil & Alamat ---
 
-// 1. Update Profil Umum (Nama, Email, Password)
+
+// --- Controller Functions ---
+
+// 1. Update Profile (Corrected)
 export const updateProfile = async (req, res) => {
   try {
-    const userId = req.userId; // Ambil ID dari middleware
+    const userId = req.userId; // Get ID from middleware
     const { name, email, currentPassword, newPassword, confirmNewPassword } = req.body;
 
     const user = await userModel.findById(userId);
@@ -50,7 +52,7 @@ export const updateProfile = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Update Nama
+    // Update Name
     if (name) {
       user.name = name;
     }
@@ -86,252 +88,231 @@ export const updateProfile = async (req, res) => {
     }
 
     await user.save();
-    res.json({ message: "Profile updated successfully.", user: { name: user.name, email: user.email } });
+    res.json({ success: true, message: "Profile updated successfully.", user: { name: user.name, email: user.email } }); // Return success: true
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Error updating profile.", error: error.message });
+    res.status(500).json({ success: false, message: "Error updating profile.", error: error.message }); // Return success: false
   }
 };
 
-// 2. Menambah Alamat Baru
-// ... (import dan fungsi lain) ...
 
+// 2. Add Address (Corrected)
 export const addAddress = async (req, res) => {
-  try {
-    const userId = req.userId;
-    // Perubahan di sini: Terima cityId, provinceId
-    const { firstName, lastName, email, phone, street, city,province, state, postalCode, cityId, provinceId } = req.body;
-
-     if (!firstName || !lastName || !email || !phone || !street || !city || !state || !postalCode || !cityId || !provinceId) {
-        return res.status(400).json({ message: 'All address fields are required' });
-    }
-
-    const user = await userModel.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    // Perubahan di sini: Gunakan cityId, provinceId, dan street
-    const newAddress = { firstName, lastName, email, phone, street, city, cityId, province, provinceId, state, postalCode };
-    user.address.push(newAddress);
-    await user.save();
-
-    const updatedUser = await userModel.findById(userId);
-    res.status(201).json({ message: 'Address added successfully', address: updatedUser.address });
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error adding address', error: error.message });
-  }
-};
-// ... fungsi yang lain tidak berubah ...
-
-// 3. Update Address
-export const updateAddress = async (req, res) => {
     try {
-        const userId = req.userId;
-        const { addressId } = req.params;
-        const { firstName, lastName, email, phone, street, city,cityId, state, postalCode, province,provinceId } = req.body; //tambahkan cityId, dan provinceId
+        const userId = req.userId;  // Get ID from middleware
+        const { firstName, lastName, email, phone, street, city, province, postalCode, cityId, provinceId } = req.body;
+
+        if (!firstName || !lastName || !email || !phone || !street || !city || !postalCode || !cityId || !provinceId) {
+          return res.status(400).json({success: false, message: 'All address fields are required' });
+        }
 
         const user = await userModel.findById(userId);
         if (!user) {
-            return res.status(404).json({ message: 'User not found' });
+            return res.status(404).json({success: false, message: 'User not found' });
         }
 
-        const addressToUpdate = user.address.id(addressId);
+        const newAddress = { firstName, lastName, email, phone, street, city, cityId, province, provinceId, postalCode };
+        user.address.push(newAddress);
+        await user.save();
+
+        res.status(201).json({ success: true, message: 'Address added successfully', address: newAddress }); // Return success: true and the *new* address
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Error adding address', error: error.message }); // Return success: false
+    }
+};
+
+
+// 3. Update Address (Corrected)
+export const updateAddress = async (req, res) => {
+    try {
+        const userId = req.userId; // Get ID from middleware
+        const { addressId } = req.params;
+        const { firstName, lastName, email, phone, street, city, cityId, postalCode, province, provinceId } = req.body;
+
+        const user = await userModel.findById(userId);
+        if (!user) {
+            return res.status(404).json({success: false, message: 'User not found' });
+        }
+
+        const addressToUpdate = user.address.id(addressId); // Use .id() to find subdocument
         if (!addressToUpdate) {
-            return res.status(404).json({ message: 'Address not found' });
+            return res.status(404).json({success: false, message: 'Address not found' });
         }
 
-        // Update fields (gunakan optional chaining untuk menghindari error jika field tidak ada)
+        // Update fields (use optional chaining to avoid errors if field is not provided)
         if (firstName) addressToUpdate.firstName = firstName;
         if (lastName) addressToUpdate.lastName = lastName;
         if (email) addressToUpdate.email = email;
         if (phone) addressToUpdate.phone = phone;
         if (street) addressToUpdate.street = street;
         if (city) addressToUpdate.city = city;
-        if(cityId) addressToUpdate.cityId = cityId;
-        if (state) addressToUpdate.state = state;
+        if (cityId) addressToUpdate.cityId = cityId;
         if (postalCode) addressToUpdate.postalCode = postalCode;
-        if(province) addressToUpdate.province = province;
-        if(provinceId) addressToUpdate.provinceId = provinceId;
+        if (province) addressToUpdate.province = province;
+        if (provinceId) addressToUpdate.provinceId = provinceId;
 
         await user.save();
-        const updatedUser = await userModel.findById(userId);
-        res.json({ message: 'Address updated successfully', address: updatedUser.address });
+        res.json({ success: true, message: 'Address updated successfully', address: addressToUpdate }); // Return success: true
 
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Error updating address', error: error.message });
+        res.status(500).json({ success:false, message: 'Error updating address', error: error.message }); // Return success: false
     }
 };
 
-// 4. Menghapus Alamat
+// 4. Delete Address (Corrected)
 export const deleteAddress = async (req, res) => {
   try {
-    const userId = req.userId;
+    const userId = req.userId; // Get ID from middleware
     const { addressId } = req.params;
 
     const user = await userModel.findById(userId);
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    user.address.pull({ _id: addressId }); // Cara yang benar menghapus subdokumen
-    await user.save();
-    const updatedUser = await userModel.findById(userId);
-
-    res.json({ message: "Address deleted successfully", address: updatedUser.address });
+      // Use .pull() to remove the subdocument
+      user.address.pull({ _id: addressId });
+      await user.save();
+      res.status(200).json({ success: true, message: "Address deleted successfully" }); // Return success: true
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Error deleting address", error: error.message });
+    res.status(500).json({ success: false, message: "Error deleting address", error: error.message }); // Return success: false
   }
 };
 
-// 5. Get User Addresses
+// 5. Get User Addresses (Corrected)
 export const getAddresses = async (req, res) => {
   try {
-      const userId = req.userId;
-      const user = await userModel.findById(userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" }); //  <-- Make sure this returns success: false
-      }
-      res.json({addresses : user.address}) //  <-- Make sure this returns success: true
+    const userId = req.userId;  // Get ID from middleware
+    const user = await userModel.findById(userId);
+    if (!user) {
+      return res.status(404).json({success: false, message: "User not found" });
+    }
+    res.status(200).json({ success: true, addresses: user.address }); // Return success: true
   } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: "Error get user address", error: error.message }); // <-- Make sure this returns success: false
+    console.error(error);
+    res.status(500).json({ success: false, message: "Error get user address", error: error.message }); // Return success: false
   }
-}
+};
 
-// 6. Get User Data (kecuali password)
+// 6. Get User Data (Excluding Password) (Corrected)
 export const getUser = async (req, res) => {
     try {
-        const userId = req.userId;
-        const user = await userModel.findById(userId).select('-password'); // Sembunyikan password
+        const userId = req.userId;  // Get ID from middleware
+        const user = await userModel.findById(userId).select('-password'); // Exclude password
         if (!user) {
-            return res.status(404).json({ message: "User not found" });
+            return res.status(404).json({success: false, message: "User not found" });
         }
-        res.json(user);
+        res.status(200).json({success: true, user});  // Consistent success: true
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: "Error getting user data", error: error.message });
+        res.status(500).json({ success: false, message: "Error getting user data", error: error.message }); // Return success: false
     }
 };
 
-// controllers/userController.js
-// In controllers/userController.js
+
+// 7. Get Address by ID (Corrected)
 export const getAddressById = async (req, res) => {
   try {
     const userId = req.userId;
     const { addressId } = req.params;
 
-    console.log("getAddressById - userId:", userId); // Log userId
-    console.log("getAddressById - addressId:", addressId); // Log addressId
-
     const user = await userModel.findById(userId);
     if (!user) {
-      console.log("getAddressById - User not found"); // Log if user not found
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ success:false, message: "User not found" });
     }
 
     const address = user.address.id(addressId);
     if (!address) {
-      console.log("getAddressById - Address not found"); // Log if address not found
-      return res.status(404).json({ message: "Address not found" });
+      return res.status(404).json({success: false, message: "Address not found" });
     }
 
-    console.log("getAddressById - Sending address:", address); // Log the address data
-    res.json({ success:true, address }); // Send the address data // ADD success: true
-
+    res.status(200).json({ success: true, address }); // Return success: true and the address
   } catch (error) {
-    console.error("getAddressById - Error:", error); // Log the error
-    res.status(500).json({ message: "Error fetching address", error: error.message });
-  }
-};
-// --- Fungsi-fungsi Auth (Login, Register, Admin Login) ---
-// (Anda sudah punya, saya sertakan lagi untuk kelengkapan)
-
-
-export const loginUser = async (req, res) => {
-  try {
-    
-    const {email, password } = req.body;
-    const user = await userModel.findOne({ email });
-    if (!user) {
-        return res.json({ success: false, message: "Email tidak ditemukan" });
-        
-      }
-
-
-    const isMatch = await bcrypt.compare(password,user.password)
-
-    if(isMatch){
-      const token = jwt.sign(
-        { userId: user._id }, // Payload
-        process.env.JWT_SECRET, // Secret key
-        { expiresIn: "1d" } // Masa berlaku token
-      );
-        res.json({success:true,token})
-    }
-    else{
-        return res.json({ success: false, message: "email atau password salah" });
-    }
-
-  } catch (error) {
-    console.log(error);
-    res.json({ success: false, message: error.message });
+    console.error("Error fetching address:", error);
+    res.status(500).json({ success: false, message: "Error fetching address", error: error.message }); // Return success: false
   }
 };
 
-//route user register
-
+// --- Auth Functions (Login, Register, Admin Login) ---
+// (Keep these as you have them, but I'm including them for completeness)
 export const registerUser = async (req, res) => {
-  try {
-    const { name, email, password } = req.body;
-
-    const exists = await userModel.findOne({ email });
-    if (exists) {
-      return res.status(400).json({ message: "Email already registered." }); // 400 Bad Request
+    try {
+      const { name, email, password } = req.body;
+  
+      const exists = await userModel.findOne({ email });
+      if (exists) {
+        return res.status(400).json({success: false, message: "Email already registered." }); // 400 Bad Request
+      }
+  
+      if (!validator.isEmail(email)) {
+        return res.status(400).json({ success: false, message: "Invalid email format." });
+      }
+      if (password.length < 8) {
+        return res.status(400).json({ success: false, message: "Password must be at least 8 characters." });
+      }
+  
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password, salt);
+  
+      const newUser = new userModel({
+        name,
+        email,
+        password: hashedPassword,
+      });
+  
+      const user = await newUser.save();
+      const token = createToken(user._id);
+      res.status(201).json({success: true, token }); // 201 Created
+  
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ success: false, message: "Registration failed", error: error.message });
     }
+  };
+  
+  export const loginUser = async (req, res) => {
+    try {
+        const {email, password } = req.body;
+        const user = await userModel.findOne({ email });
+        if (!user) {
+            return res.status(401).json({ success: false, message: "Email tidak ditemukan" }); // Use 401 for auth errors
+        }
+        const isMatch = await bcrypt.compare(password,user.password)
 
-    if (!validator.isEmail(email)) {
-      return res.status(400).json({ message: "Invalid email format." });
+        if(isMatch){
+           const token = jwt.sign(
+             { userId: user._id }, // Payload
+             process.env.JWT_SECRET, // Secret key
+             { expiresIn: "1d" } // Masa berlaku token
+           );
+            res.status(200).json({success:true, token}) // Return success: true
+        }
+        else{
+            return res.status(401).json({ success: false, message: "email atau password salah" });
+        }
+
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ success: false, message: error.message });
     }
-    if (password.length < 8) {
-      return res.status(400).json({ message: "Password must be at least 8 characters." });
+  };
+
+  export const adminLogin = async (req, res) => {
+    try {
+      const { email, password } = req.body;
+  
+      if (email === process.env.ADMIN_EMAIL && password === process.env.ADMIN_PASSWORD) {
+        const token = jwt.sign({ email, password }, process.env.JWT_SECRET); // Payload for admin
+        res.status(200).json({success: true, token }); // Return success: true
+      } else {
+        res.status(401).json({ success: false, message: "Kredensial salah" }); // 401 Unauthorized
+      }
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ success: false, message: error.message });
     }
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    const newUser = new userModel({
-      name,
-      email,
-      password: hashedPassword,
-    });
-
-    const user = await newUser.save();
-    const token = createToken(user._id);
-    res.status(201).json({ token }); // 201 Created
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Registration failed", error: error.message });
-  }
-};
-
-export const adminLogin = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    if (email === process.env.ADMIN_EMAIL && password === process.env.ADMIN_PASSWORD) {
-      const token = jwt.sign({ email, password }, process.env.JWT_SECRET); // Payload untuk admin
-      res.json({ success: true, token });
-    } else {
-      res.status(401).json({ success: false, message: "Kredensial salah" }); // 401 Unauthorized
-    }
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+  };

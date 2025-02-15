@@ -12,6 +12,7 @@ export const InputField = ({
   error = "",
   placeholder = "",
   required = false,
+  isDisabled = false,
 }) => (
   <div className="mb-4">
     <label htmlFor={name} className="block text-sm font-medium text-gray-700">
@@ -26,6 +27,7 @@ export const InputField = ({
       className={`mt-1 block w-full px-3 py-2 border  rounded-md shadow-sm focus:outline-none  sm:text-sm ${error ? 'border-red-500 ring-red-500' : 'border-gray-300 focus:ring-indigo-500 focus:border-indigo-500'}`}
       placeholder={placeholder}
       required={required}
+      isDisabled = {isDisabled}
     />
     {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
   </div>

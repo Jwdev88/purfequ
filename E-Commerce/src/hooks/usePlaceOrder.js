@@ -24,7 +24,7 @@ const initialState = {
   isLoadingCost: false,
   cost: null,
   selectedService: null,
-  orderId: null, // Add orderId to the state
+  orderId: null,
 };
 
 const reducer = (state, action) => {
@@ -56,7 +56,7 @@ const reducer = (state, action) => {
         ...state,
         formData: { ...state.formData, city: action.payload },
       };
-    case "SET_ORDER_ID": // New action to set orderId
+    case "SET_ORDER_ID":
       return { ...state, orderId: action.payload };
     case "RESET_FORM":
       return {
@@ -72,11 +72,12 @@ const reducer = (state, action) => {
 const usePlaceOrder = () => {
   const [state, dispatch] = useReducer(reducer, initialState);
   const navigate = useNavigate();
-  const { clearCart, backendUrl, token, cartItems } = useContext(ShopContext);
+  const { clearSelectedItemsFromCart, backendUrl, token, cartItems } =
+    useContext(ShopContext); // Correctly get cartItems
 
   const citiesCache = useMemo(() => new Map(), []);
 
-  // --- Fetch Provinces ---
+  // --- Fetch Provinces (No Changes) ---
   useEffect(() => {
     const fetchProvinces = async () => {
       try {
@@ -98,7 +99,7 @@ const usePlaceOrder = () => {
     fetchProvinces();
   }, [backendUrl, token]);
 
-  // --- Fetch Cities ---
+  // --- Fetch Cities (No Changes) ---
   const fetchCities = useCallback(
     async (provinceId) => {
       if (!provinceId) {
@@ -112,7 +113,6 @@ const usePlaceOrder = () => {
       }
 
       try {
-        // No global loading state here.
         const response = await apiCall(
           `${backendUrl}/api/rajaongkir/cities/${provinceId}`,
           "GET",
@@ -132,7 +132,6 @@ const usePlaceOrder = () => {
     },
     [backendUrl, token, citiesCache]
   );
-
   // --- Prefill Address ---
   useEffect(() => {
     const fetchUserAddresses = async () => {
@@ -183,7 +182,7 @@ const usePlaceOrder = () => {
     }
   }, [backendUrl, token, fetchCities]);
 
-  // --- Calculate Shipping Cost ---
+  // --- Calculate Shipping Cost (using itemsToCheckout) ---
   const calculateShippingCost = useCallback(async () => {
     if (!state.formData.city || state.cities.length === 0) {
       dispatch({ type: "SET_COST", payload: null });
@@ -191,21 +190,51 @@ const usePlaceOrder = () => {
     }
 
     dispatch({ type: "SET_LOADING_COST", payload: true });
+
+    // --- CORRECTED: Get itemsToCheckout here ---
+    const buyNowItem = localStorage.getItem("buyNowItem");
+    const checkoutItems = localStorage.getItem("checkoutItems");
+    let itemsToUse = [];
+
+    if (buyNowItem) {
+      try {
+        itemsToUse = [JSON.parse(buyNowItem)]; // Buy Now item
+      } catch (error) {
+        console.error("Error parsing buyNowItem:", error);
+        toast.error("Invalid buy now item data.");
+        dispatch({ type: "SET_LOADING_COST", payload: false }); // Stop loading
+        return;
+      }
+    } else if (checkoutItems) {
+      try {
+        itemsToUse = JSON.parse(checkoutItems); // Selected cart items
+      } catch (error) {
+        console.error("Error parsing checkoutItems:", error);
+        toast.error("Invalid checkout items data.");
+        dispatch({ type: "SET_LOADING_COST", payload: false }); // Stop loading
+        return;
+      }
+    } else {
+      // No items to checkout
+      dispatch({ type: "SET_LOADING_COST", payload: false });
+      return;
+    }
+    // --- END Corrected itemsToCheckout Logic ---
+
     try {
+      const totalWeightGram = itemsToUse.reduce((total, item) => {
+        const itemWeight =
+          item.variant?.selectedOption?.optionWeight ?? item.productWeight ?? 0;
+        return total + itemWeight * (item.quantity || 1); //Default to quantity 1
+      }, 0);
+
       const payload = {
-        origin: "501", //  <<---  REPLACE WITH YOUR ORIGIN!
+        origin: "501", // <<---  REPLACE WITH YOUR ORIGIN!
         destination: state.formData.city,
-        weight: cartItems.reduce(
-          (acc, item) =>
-            acc +
-            (item.variant?.selectedOption?.optionWeight ??
-              item.productWeight ??
-              0) *
-              item.quantity,
-          0
-        ),
+        weight: totalWeightGram, // Use calculated weight, in grams
         courier: "jne", // Consider making this dynamic
       };
+
       const response = await apiCall(
         `${backendUrl}/api/rajaongkir/cost`,
         "POST",
@@ -226,7 +255,7 @@ const usePlaceOrder = () => {
     } finally {
       dispatch({ type: "SET_LOADING_COST", payload: false });
     }
-  }, [backendUrl, cartItems, state.formData.city, state.cities.length, token]); // Correct dependencies
+  }, [backendUrl, state.formData.city, state.cities.length, token, cartItems]); // Add cartItems as dependency
 
   // --- Trigger Shipping Cost Calculation (useEffect) ---
   useEffect(() => {
@@ -242,7 +271,7 @@ const usePlaceOrder = () => {
     }
   }, [state.formData.province, fetchCities]);
 
-  // --- Handlers ---
+  // --- Handlers (No Changes) ---
   const handleProvinceChange = useCallback(
     (provinceId) => {
       dispatch({ type: "SET_SELECTED_PROVINCE", payload: provinceId });
@@ -289,14 +318,37 @@ const usePlaceOrder = () => {
       localStorage.setItem("orderId", orderId);
       dispatch({ type: "SET_ORDER_ID", payload: orderId });
 
+      // --- Handle Clearing Cart (Conditional) ---
+      const buyNowItem = localStorage.getItem("buyNowItem");
+      if (buyNowItem) {
+        // Don't clear cart on "Buy Now"
+        // console.log("Buy Now order.  Not clearing cart.");
+      } else {
+        // Clear *only selected items* after successful cart checkout
+        const checkoutItems = JSON.parse(
+          localStorage.getItem("checkoutItems") || "[]"
+        );
+        if (checkoutItems.length > 0) {
+          const itemIdsToRemove = checkoutItems.map((item) => {
+            // Construct the same key used in Cart.jsx for selection
+            return `${item.productId}-${
+              item.variant?.variantId || "no-variant"
+            }-${item.variant?.selectedOption?.optionId || "no-option"}`;
+          });
+          await clearSelectedItemsFromCart(itemIdsToRemove); // Call the new function
+        }
+      }
+      // --- END Handle Clearing Cart ---
+
+      // --- Midtrans Payment Handling ---
       if (window.snap) {
         window.snap.pay(midtransToken, {
-          //  <--  Call snap.pay correctly
           onSuccess: (result) => {
             console.log("Midtrans success:", result);
             toast.success("Payment successful!");
-            clearCart();
+            //Cart cleared based on buy now or check out
             localStorage.removeItem("orderId");
+            localStorage.removeItem("buyNowItem"); //  <--  ADD THIS
             navigate("/orders");
           },
           onPending: (result) => {
@@ -308,6 +360,8 @@ const usePlaceOrder = () => {
           onError: (result) => {
             console.log("Midtrans error:", result);
             dispatch({ type: "SET_LOADING", payload: false });
+            dispatch({ type: "RESET_FORM" }); //reset form
+
             toast.error("Payment failed! Please try again.");
           },
           onClose: () => {
@@ -315,22 +369,20 @@ const usePlaceOrder = () => {
             dispatch({ type: "SET_LOADING", payload: false });
             toast.warn("Payment window closed.");
             navigate(`/orders?orderId=${orderId}`);
+            dispatch({ type: "RESET_FORM" }); //reset form
           },
-          // NO options object needed here!
         });
       } else {
-        window.location.href = redirect_url; // Fallback to redirect URL
+        window.location.href = redirect_url;
       }
     } catch (error) {
-      console.error("Error creating order:", error); // Log the error
+      console.error("Error creating order:", error);
       dispatch({ type: "SET_LOADING", payload: false });
-      toast.error(error.message || "Failed to create order."); // Show user-friendly message
+      toast.error(error.message || "Failed to create order.");
     } finally {
-      dispatch({ type: "RESET_FORM" }); //reset form
-      dispatch({ type: "SET_LOADING", payload: false }); // Ensure loading is off
+      dispatch({ type: "SET_LOADING", payload: false });
     }
   };
-
 
   return {
     state,

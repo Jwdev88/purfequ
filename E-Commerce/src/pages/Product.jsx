@@ -1,167 +1,183 @@
-import React, {
-  useContext,
-  useEffect,
-  useState,
-  useReducer,
-  useCallback,
-} from "react";
-import { useParams, Link } from "react-router-dom";
+// --- components/Product.jsx ---
+import React, { useContext, useEffect, useState,useCallback } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { ShopContext } from "../context/ShopContext";
-import RelatedProducts from "../components/RelatedProducts"; // Assuming you have this
-import { Stars, Loader, AlertTriangle } from "lucide-react";
-
-const initialState = {
-  productData: null,
-  selectedImage: null,
-  selectedVariant: null,
-  isAddingToCart: false,
-  isLoading: true,
-  error: null,
-};
-
-const reducer = (state, action) => {
-  switch (action.type) {
-    case "SET_PRODUCT_DATA":
-      return {
-        ...state,
-        productData: action.payload,
-        selectedImage: action.payload?.images?.[0] || null,
-        isLoading: false,
-        error: null,
-      };
-    case "SET_SELECTED_IMAGE":
-      return { ...state, selectedImage: action.payload };
-    case "SET_SELECTED_VARIANT":
-      return { ...state, selectedVariant: action.payload };
-    case "SET_IS_ADDING_TO_CART":
-      return { ...state, isAddingToCart: action.payload };
-    case "SET_LOADING":
-      return { ...state, isLoading: action.payload };
-    case "SET_ERROR":
-      return {
-        ...state,
-        isLoading: false,
-        error: action.payload,
-        productData: null,
-      };
-    default:
-      return state;
-  }
-};
+import { Loader, AlertTriangle } from "lucide-react";
+import { useProduct } from "../hooks/useProduct";
+import { toast } from "react-toastify";
+import { Loader2Icon } from "lucide-react";
 
 const Product = () => {
   const { productId } = useParams();
-  const { formatIDR, addToCart, products, categories, subCategories } =
-    useContext(ShopContext);
-  const [state, dispatch] = useReducer(reducer, initialState);
-  const [displayPrice, setDisplayPrice] = useState("Loading..."); // Initialize with "Loading..."
+  const { formatIDR, products, categories, subCategories, fetchData, backendUrl, shopActionTypes} =
+    useContext(ShopContext); // Add fetchData and shopActionTypes
+  const [displayPrice, setDisplayPrice] = useState("Loading...");
+  const [displayStock, setDisplayStock] = useState(0);
+  const navigate = useNavigate();
+
+    const { state, handleVariantChange, handleAddToCart, dispatch } =
+    useProduct(productId);
+
+
+    // --- Refetch product data (add this function) ---
+    const refetchProductData = useCallback(async () => {
+        try {
+            await fetchData(
+                `${backendUrl}/api/product/list`,  // Refetch ALL products
+                shopActionTypes.SET_PRODUCTS,
+                "Failed to fetch product data."
+            );
+        } catch (error) {
+            // Error is already handled in fetchData
+        }
+    }, [fetchData, backendUrl, shopActionTypes]);
+
 
   useEffect(() => {
-    const fetchProductData = async () => {
-      dispatch({ type: "SET_LOADING", payload: true });
-      try {
-        const product = products.find((p) => p._id === productId);
-        if (product) {
-          dispatch({ type: "SET_PRODUCT_DATA", payload: product });
-        } else {
-          dispatch({ type: "SET_ERROR", payload: "Product not found" });
-        }
-      } catch (error) {
-        dispatch({ type: "SET_ERROR", payload: "Failed to fetch product" });
-      }
-    };
-
-    if (products.length > 0) {
-      fetchProductData();
-    }
-  }, [productId, products]);
-
-  // --- Calculate Display Price (useCallback) ---
-  const calculateDisplayPrice = useCallback(() => {
-    let priceToDisplay = "";
+    let priceToDisplay = "Loading...";
+    let stockToDisplay = 0;
 
     if (state.productData) {
-      let price = null; // Simpan harga, bukan minPrice/maxPrice
-
-      // 1. Cek apakah ada varian
-      if (state.productData.variants && state.productData.variants.length > 0) {
-        // Ambil harga dari varian PERTAMA, dan opsi PERTAMA dari varian tersebut
+      if (state.selectedVariant) {
+        const price = state.selectedVariant.price;
+        priceToDisplay =
+          price === null || isNaN(price)
+            ? ""
+            : price === 0
+            ? "Free"
+            : formatIDR(price ?? 0);
+        stockToDisplay = state.selectedVariant.stock;
+      } else if (
+        state.productData.variants &&
+        state.productData.variants.length > 0
+      ) {
         if (
           state.productData.variants[0].options &&
           state.productData.variants[0].options.length > 0
         ) {
-          price = state.productData.variants[0].options[0].price;
+          const price = state.productData.variants[0].options[0].price;
+          priceToDisplay =
+            price === null || isNaN(price)
+              ? ""
+              : price === 0
+              ? "Free"
+              : formatIDR(price ?? 0);
+          stockToDisplay = state.productData.variants[0].options[0].stock;
         }
-      } else if (state.productData.price != null) {
-        // 2. Jika tidak ada varian, gunakan harga utama produk
-        price = state.productData.price;
-      }
-
-      // 3. Format harga
-      if (price === null || isNaN(price)) {
-        priceToDisplay = ""; // Jika tidak ada harga, kosongkan
-      } else if (price === 0) {
-        priceToDisplay = "Free";
       } else {
-        priceToDisplay = formatIDR(price); // Format harga
+        const price = state.productData.price;
+        priceToDisplay =
+          price === null || isNaN(price)
+            ? ""
+            : price === 0
+            ? "Free"
+            : formatIDR(price ?? 0);
+        stockToDisplay = state.productData.stock;
       }
-    }
-
-    return priceToDisplay;
-  }, [state.productData, formatIDR]);
-
-  // --- useEffect to Update Display Price ---
-  useEffect(() => {
-    let priceToDisplay = ""; // Initialize
-
-    if (state.selectedVariant) {
-      // If a variant IS selected, use its price directly.
-      priceToDisplay = formatIDR(state.selectedVariant.optionPrice);
-    } else {
-      // If NO variant is selected (either no variants or not selected), calculate.
-      priceToDisplay = calculateDisplayPrice();
     }
 
     setDisplayPrice(priceToDisplay);
-  }, [state.productData, state.selectedVariant, calculateDisplayPrice]);
-  const handleVariantChange = useCallback((variantName, option, variantId) => {
-    dispatch({
-      type: "SET_SELECTED_VARIANT",
-      payload: {
-        variantName,
-        optionId: option._id,
-        variantId,
-        optionName: option.name,
-        optionPrice: option.price,
-      },
-    });
-  }, []);
+    setDisplayStock(stockToDisplay);
+  }, [state.productData, state.selectedVariant, formatIDR]);
 
-  const handleAddToCart = useCallback(async () => {
-    if (!state.productData) return;
+  // --- Polling (useEffect) ---
+    useEffect(() => {
+        const intervalId = setInterval(() => {
+            refetchProductData(); // Re-fetch data every 5 seconds
+        }, 5000); // 5000 milliseconds = 5 seconds
 
-    dispatch({ type: "SET_IS_ADDING_TO_CART", payload: true });
-    try {
-      let variantId = null;
-      let optionId = null;
-      if (state.selectedVariant) {
-        variantId = state.selectedVariant.variantId;
-        optionId = state.selectedVariant.optionId;
-      }
-      await addToCart(state.productData._id, variantId, optionId, 1);
-    } catch (error) {
-      console.error("Error adding to cart", error);
-    } finally {
-      dispatch({ type: "SET_IS_ADDING_TO_CART", payload: false });
-    }
-  }, [state.productData, state.selectedVariant, addToCart]);
+        // Cleanup function to clear the interval when the component unmounts
+        return () => clearInterval(intervalId);
+    }, [refetchProductData]); // Dependency on refetchProductData
+
+
+     const handleBuyNow = () => {
+        const token = localStorage.getItem("token");
+        if (!token) {
+            toast.warn("Silakan login untuk melanjutkan pembelian.", {
+                onClose: () => navigate("/login"),
+            });
+            return;
+        }
+
+        const hasVariants = state.productData.variants && state.productData.variants.length > 0;
+
+        if (hasVariants && (!state.selectedVariant || !state.selectedVariant.optionId)) {
+            toast.error("Harap pilih varian sebelum melanjutkan pembelian.");
+            return;
+        }
+
+        let finalStockCheck = true;
+        let itemData;
+
+        if (hasVariants) {
+             const selectedOption = state.productData.variants
+                .flatMap((variant) => variant.options)
+                .find((option) => option._id === state.selectedVariant.optionId);
+
+            if (!selectedOption || selectedOption.stock <= 0) {
+                toast.error("Varian ini tidak tersedia.");
+                finalStockCheck = false;
+                return; // Add return here
+            }
+             itemData = {
+                productId: state.productData._id,
+                productName: state.productData.name,
+                productImages: state.productData.images,
+                productPrice: state.productData.price,
+                productWeight: state.productData.weight,
+                productStock: state.productData.stock, // Initial stock
+                productSku: state.productData.sku,
+                quantity: 1,
+                variant: {
+                    variantId: state.selectedVariant.variantId,
+                    variantName: state.selectedVariant.variantName,
+                    selectedOption: {
+                        optionId: selectedOption._id,
+                        optionName: selectedOption.name,
+                        optionPrice: selectedOption.price,
+                        optionStock: selectedOption.stock, // Initial stock
+                        optionSku: selectedOption.sku,
+                         optionWeight: selectedOption.weight,
+                    }
+                }
+            }
+        } else {
+            if (state.productData.stock <= 0) {
+                toast.error("Produk ini tidak tersedia.");
+                return; // Add return here
+            }
+              itemData = {
+                productId: state.productData._id,
+                productName: state.productData.name,
+                productImages: state.productData.images,
+                productPrice: state.productData.price,
+                productStock: state.productData.stock,
+                productSku: state.productData.sku,
+                productWeight: state.productData.weight,
+                quantity: 1, // Default quantity = 1
+                variant: null, // No variant for main product
+            };
+        }
+        if (!finalStockCheck) return;
+
+        console.log("handleBuyNow - itemData:", itemData);
+
+        localStorage.removeItem('checkoutItems');
+        localStorage.setItem('buyNowItem', JSON.stringify(itemData));
+        navigate('/place-order');
+    };
+
 
   if (state.isLoading) {
+ 
     return (
-      <div className="flex justify-center items-center h-screen">
-        <Loader className="animate-spin h-10 w-10 text-gray-500" />
+      <div className="flex items-center justify-center h-screen">
+        <Loader2Icon className="animate-spin h-16 w-16 mr-4" />
+        <span className="text-lg font-semibold">Loading...</span>
       </div>
-    );
+    ); // Keep this, it handles initial loading
+  
   }
 
   if (state.error) {
@@ -231,26 +247,9 @@ const Product = () => {
             <h1 className="text-3xl font-semibold mb-2">
               {state.productData.name}
             </h1>
-            {/* Rating Stars */}
-            <div className="flex items-center mb-4">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Stars
-                  key={i}
-                  className={`w-5 h-5 ${
-                    i < Math.floor(state.productData.rating || 0)
-                      ? "text-yellow-400"
-                      : "text-gray-300"
-                  }`}
-                />
-              ))}
-              <span className="ml-2 text-sm text-gray-500">
-                ({state.productData.rating || 0})
-              </span>
-            </div>
 
-            {/* Display Price */}
             <p className="text-xl font-bold text-gray-900 mb-4">
-              {displayPrice} {/* Use the calculated displayPrice */}
+              {displayPrice} {/*DISPLAY PRICE */}
             </p>
             <p className="text-gray-600 mb-2">
               <span className="font-semibold">Category: </span>
@@ -262,8 +261,15 @@ const Product = () => {
                 {subCategoryName}
               </p>
             )}
+             <p className="text-gray-600 mb-4">
+                <span className="font-semibold">Stock: </span>
+                {displayStock > 0 ? (
+                    <span>{displayStock}</span>
+                ) : (
+                    <span className="text-red-600">Habis</span>
+                )}
+            </p>
 
-            {/* Product Description */}
             <p className="text-gray-700 mb-6 whitespace-pre-line">
               {state.productData.description}
             </p>
@@ -274,12 +280,8 @@ const Product = () => {
                 {state.productData.variants.map((variant) => (
                   <div key={variant._id} className="mb-4">
                     <p className="text-gray-700 mb-2">{variant.name}</p>
-                    {/* Horizontal scrolling container */}
                     <div className="overflow-x-auto whitespace-nowrap py-2">
-                      {/* Add padding to the container */}
                       <div className="inline-block">
-                        {" "}
-                        {/* Add this for correct scrolling */}
                         {variant.options.map((option) => (
                           <button
                             key={option._id}
@@ -290,16 +292,22 @@ const Product = () => {
                                 variant._id
                               )
                             }
+                            disabled={option.stock <= 0}
                             className={`px-4 py-2 border rounded-md text-sm font-medium inline-block mr-2 last:mr-0 ${
-                              /* Add inline-block and margin */
                               state.selectedVariant?.variantId ===
                                 variant._id &&
                               state.selectedVariant?.optionId === option._id
                                 ? "border-blue-500 bg-blue-100 text-blue-600"
                                 : "border-gray-300 hover:bg-gray-100 text-gray-700"
-                            } transition-colors whitespace-nowrap`} /* Add whitespace-nowrap */
+                            } ${
+                              option.stock <= 0
+                                ? "opacity-50 cursor-not-allowed"
+                                : ""
+                            } transition-colors whitespace-nowrap`}
                           >
-                            {option.name}
+                           {option.stock <= 0
+                            ? `${option.name} (Habis)`
+                            : option.name}
                           </button>
                         ))}
                       </div>
@@ -308,26 +316,41 @@ const Product = () => {
                 ))}
               </div>
             )}
-
-            {/* Add to Cart Button */}
+            <div className="flex gap-4">
             <button
-              onClick={handleAddToCart}
-              disabled={state.isAddingToCart}
-              className={`w-full px-6 py-3 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold transition duration-200 ${
-                state.isAddingToCart ? "opacity-50 cursor-not-allowed" : ""
-              }`}
+                onClick={handleAddToCart}
+                disabled={state.isAddingToCart || displayStock <= 0}
+                className={`px-6 py-3 rounded-full  text-white font-bold transition duration-200 ${
+                state.isAddingToCart || displayStock <= 0
+                    ? "bg-gray-400 cursor-not-allowed" // Greyed out
+                    : "bg-blue-600 hover:bg-blue-700" // Normal state
+                }`}
             >
-              {state.isAddingToCart ? (
+                {state.isAddingToCart ? (
                 <>
-                  <Loader className="animate-spin h-5 w-5 inline-block mr-2" />
-                  Adding...
+                    <Loader2Icon className="animate-spin h-5 w-5 inline-block mr-2" />
+                    Adding...
                 </>
-              ) : (
+                ) : (
                 "Add to Cart"
-              )}
+                )}
             </button>
 
-            {/* Back to Collection Link */}
+            <button
+
+                onClick={handleBuyNow}
+                disabled={displayStock <= 0}
+                className={`px-6 py-3 rounded-full  text-white font-bold transition duration-200 ${
+                displayStock <= 0
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-green-600 hover:bg-green-700"
+                }`}
+            >
+                Beli Langsung
+            </button>
+            </div>
+            
+
             <div className="mt-4 text-center">
               <Link to="/collection" className="text-blue-600 hover:underline">
                 &larr; Back to Collection

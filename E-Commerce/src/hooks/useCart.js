@@ -1,134 +1,63 @@
-import { useReducer, useEffect, useCallback } from "react";
-import { notifySuccess, notifyError,notifyWarningWithAction } from "../components/ToastNotification";
+// --- hooks/useCart.js ---
+import { useCallback } from 'react';
+import { toast } from 'react-toastify';
+import { apiCall } from '../utils/apiCall';
 
-
-
-const actionTypes = {
-  SET_CART_DATA: "SET_CART_DATA",
-  ADD_TO_CART: "ADD_TO_CART",
-  UPDATE_QUANTITY: "UPDATE_QUANTITY",
-  REMOVE_ITEM: "REMOVE_ITEM",
-  CLEAR_CART: "CLEAR_CART",
-};const formatCartItemData = (item) => {
-  if (!item || !item.productId) {
-    return null; // Abaikan item yang tidak valid
-  }
-
-  const itemPrice = parseFloat(item.variant?.selectedOption?.optionPrice ?? item.productPrice ?? 0);
-  const itemQuantity = parseInt(item.quantity, 10) || 1;
-  
-  // Mengambil berat dari varian jika ada, jika tidak ada maka gunakan berat default (misalnya 0)
-  const itemWeight = item.variant?.selectedOption?.weight ?? 0;
-
-  return {
-    productId: item.productId,
-    productName: item.productName || "Unknown Product",
-    productImage: item.productImages?.[0] || "/default-image.png",
-    productPrice: itemPrice,
-    productCategory: item.productCategory || "No Category",
-    productSubCategory: item.productSubCategory || "No Subcategory",
-    variantId: item.variant?.variantId || null,
-    variantName: item.variant?.variantName || "No Variant",
-    optionId: item.variant?.selectedOption?.optionId || null,
-    optionName: item.variant?.selectedOption?.optionName || "No Option",
-    optionPrice: itemPrice,
-    weight: itemWeight,  // Menambahkan berat pada format item
-    quantity: itemQuantity,
-    totalPrice: itemPrice * itemQuantity,
-  };
-};
-
-
-const cartReducer = (state, action) => {
-  switch (action.type) {
-    case actionTypes.SET_CART_DATA:
-      return action.payload.filter(item => item !== null); // Abaikan item yang tidak valid
-    case actionTypes.ADD_TO_CART:
-      return [...state, action.payload];
-    case actionTypes.UPDATE_QUANTITY:
-      return state.map((item) =>
-        item.productId === action.payload.productId &&
-        item.variantId === action.payload.variantId &&
-        item.optionId === action.payload.optionId
-          ? { ...item, quantity: action.payload.newQuantity, totalPrice: item.optionPrice * action.payload.newQuantity }
-          : item
-      );
-    case actionTypes.REMOVE_ITEM:
-      return state.filter((item) =>
-        item.productId !== action.payload.productId ||
-        item.variantId !== action.payload.variantId ||
-        item.optionId !== action.payload.optionId
-      );
-    case actionTypes.CLEAR_CART:
-      return [];
-    default:
-      return state;
-  }
-};
-export const useCart = (cartItems, updateQuantity, removeItemFromCart, clearCart) => {
-  const [cartData, dispatch] = useReducer(cartReducer, []);
-  
-  useEffect(() => {
-    if (cartItems?.length) {
-  
-      const formattedCartData = cartItems.map(formatCartItemData).filter(item => item !== null);
-      dispatch({ type: actionTypes.SET_CART_DATA, payload: formattedCartData });
-    }
-  }, [cartItems]);
-
-  const handleQuantityChange = useCallback(
-    async (productId, variantId, optionId, newQuantity) => {
-      if (!productId || newQuantity < 1) {
-        notifyError("Kuantitas tidak valid.");
+export const useCart = (cartItems, updateQuantityFn, removeItemFromCartFn, clearCartFn) => {
+  const handleQuantityChange = useCallback(async (productId, variantId, optionId, newQuantity) => {
+    // Validasi kuantitas
+    if (isNaN(newQuantity) || newQuantity < 1) {
+        toast.warn("Invalid quantity."); // Use toast
         return;
+    }
+    try {
+      const updatedCart = await updateQuantityFn(productId, variantId, optionId, newQuantity);
+      if (updatedCart) {
+          // Jika updateQuantityFn mengembalikan data keranjang yang baru,
+          // asumsikan semuanya berhasil.  Tidak perlu menampilkan toast di sini
+          // karena updateQuantityFn sendiri sudah menampilkannya.
       }
 
-      try {
-        const updatedCartItems = await updateQuantity(productId, variantId, optionId, newQuantity);
-        if (!updatedCartItems || !Array.isArray(updatedCartItems)) {
-          throw new Error("Gagal memperbarui kuantitas."); // Tambahkan pengecekan validitas data
+    } catch (error) {
+        // updateQuantityFn sudah menampilkan toast, jadi kita tidak perlu melakukannya lagi
+        //  toast.error("Error updating quantity."); // Redundant, already handled
+    }
+  }, [updateQuantityFn]); // Dependensi yang benar
+
+
+    const handleRemoveItem = useCallback(async (productId, variantId, optionId) => {
+        try {
+            await removeItemFromCartFn(productId, variantId, optionId);
+            // toast.success("Item removed from cart."); // Removed, handled in context
+        } catch (error) {
+            // toast.error("Error removing item from cart."); // Handled in context
         }
-        const formattedCartData = updatedCartItems.map(formatCartItemData).filter(item => item !== null);
-        dispatch({ type: actionTypes.SET_CART_DATA, payload: formattedCartData });
-        notifySuccess("Kuantitas berhasil diperbarui.");
-      } catch (error) {
-        notifyError("Gagal memperbarui kuantitas.");
-      }
-    },
-    [updateQuantity]
-  );
+    }, [removeItemFromCartFn]);
 
-  const handleRemoveItem = useCallback(
-    async (productId, variantId, optionId) => {
-      try {
-        await removeItemFromCart(productId, variantId, optionId);
-        dispatch({ type: actionTypes.REMOVE_ITEM, payload: { productId, variantId, optionId } });
-        notifySuccess("Item berhasil dihapus dari keranjang.", );
-      } catch (error) {
-        notifyError("Gagal menghapus item.");
-      }
-    },
-    [removeItemFromCart]
-  );
+    const handleClearCart = useCallback(async () => {
+        try {
+            await clearCartFn();
+            // toast.success("Cart cleared."); // Removed, handled in context
+        } catch (error) {
+            // toast.error("Error clearing cart."); // Handled in context
+        }
+    }, [clearCartFn]);
 
 
-  const handleClearCart = useCallback(
-    async () => {
-      try {
-        await clearCart();
-        dispatch({ type: actionTypes.CLEAR_CART });
-        notifySuccess("Keranjang berhasil dikosongkan.");
-      } catch (error) {
-        notifyError("Gagal mengosongkan keranjang.");
-      }
-    },
-    [clearCart]
-  );
+    // Kalkulasi subtotal di sini.  Ini lebih efisien daripada menghitungnya di CartItem.
+    const cartData = cartItems.map(item => {
+        const product = item.productId;
 
-  return {
-    cartData,
-    handleQuantityChange,
-    handleRemoveItem,
-    handleClearCart,
-  };
+        // Cek apakah product, variants, dan options ada sebelum mengakses propertinya
+        const selectedVariant = product?.variants?.find(variant => variant._id.toString() === item.variantId?.toString());
+        const selectedOption = selectedVariant?.options?.find(option => option._id.toString() === item.optionId?.toString());
+
+        return {
+            ...item,
+            totalPrice: (selectedOption?.price ?? product?.price ?? 0) * item.quantity,
+            productImage: product?.images?.[0] // Ambil gambar pertama, atau undefined
+        };
+    });
+
+    return { cartData, handleQuantityChange, handleRemoveItem, handleClearCart };
 };
