@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../node_modules/@arismun/format-rupiah/src/index.ts"],
+  "sourcesContent": ["export interface FormatRupiahProps {\n  value: number;\n}\n\nexport const FormatRupiah = ({ value }: FormatRupiahProps) => {\n  return new Intl.NumberFormat('id-ID', {\n    style: 'currency',\n    currency: 'IDR',\n    minimumFractionDigits: 0,\n  }).format(value);\n};\n"],
+  "mappings": ";;;IAIaA,eAAe,SAAfA,cAAe,MAAA;MAAGC,QAAAA,KAAAA;AAC7B,SAAO,IAAIC,KAAKC,aAAa,SAAS;IACpCC,OAAO;IACPC,UAAU;IACVC,uBAAuB;EAHa,CAA/B,EAIJC,OAAON,KAJH;AAKR;",
+  "names": ["FormatRupiah", "value", "Intl", "NumberFormat", "style", "currency", "minimumFractionDigits", "format"]
+}
