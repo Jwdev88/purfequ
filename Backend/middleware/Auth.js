@@ -39,7 +39,7 @@ const authUser = async (req, res, next) => {
         .status(401)
         .json({ success: false, message: "Token kadaluarsa." });
     } else {
-      console.error("Kesalahan autentikasi:", error); // Log *all* errors
+      // console.error("Kesalahan autentikasi:", error); // Log *all* errors
       return res
         .status(401) // Consistent 401 for auth failures
         .json({ success: false, message: "Autentikasi gagal." });
