@@ -19,7 +19,7 @@ export const apiCall = async (url, method = "GET", data = {}, token = "") => {
     // IMPORTANT:  Get status and message consistently.
     const status = error.response?.status || 500; // Default to 500 if no response
     const errorMessage = error.response?.data?.message || error.message || "An unknown error occurred";
-    console.error("API Call Error:", errorMessage, error.response); // Log for debugging
+    // console.error("API Call Error:", errorMessage, error.response); // Log for debugging
     // Throw the error, so the caller can handle it.
     throw { message: errorMessage, status: status }; // Throw an object with message and status
   }

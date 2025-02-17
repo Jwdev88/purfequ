@@ -64,7 +64,6 @@ const Product = () => {
     setDisplayStock(stockToDisplay);
   }, [state.productData, state.selectedVariant, formatIDR]);
 
-  // --- Removed Polling (useEffect) ---
 
   const handleBuyNow = () => {
     const token = localStorage.getItem("token");

@@ -6,8 +6,8 @@ import { apiCall } from '../utils/apiCall';
 export const useCart = (cartItems, updateQuantityFn, removeItemFromCartFn, clearCartFn) => {
   const handleQuantityChange = useCallback(async (productId, variantId, optionId, newQuantity) => {
     // Validasi kuantitas
-    if (isNaN(newQuantity) || newQuantity < 1) {
-        toast.warn("Invalid quantity."); // Use toast
+    if (isNaN(newQuantity) || newQuantity < 1 || newQuantity % 1 !== 0) {
+        toast.warn("Invalid quantity.  Only whole numbers are allowed."); // Use toast
         return;
     }
     try {

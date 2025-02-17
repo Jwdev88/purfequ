@@ -92,8 +92,8 @@ const usePlaceOrder = () => {
         }
         dispatch({ type: "SET_PROVINCES", payload: response.data.provinces });
       } catch (error) {
-        console.error(error);
-        toast.error(error.message || "Failed to fetch provinces.");
+        // console.error(error);
+        // toast.error(error.message || "Failed to fetch provinces.");
       }
     };
     fetchProvinces();
@@ -125,8 +125,8 @@ const usePlaceOrder = () => {
         citiesCache.set(provinceId, response.data.cities);
         dispatch({ type: "SET_CITIES", payload: response.data.cities });
       } catch (error) {
-        console.error("Error fetching cities:", error);
-        toast.error(error.message || "Failed to fetch cities.");
+        // console.error("Error fetching cities:", error);
+        // toast.error(error.message || "Failed to fetch cities.");
         dispatch({ type: "SET_CITIES", payload: [] });
       }
     },
@@ -171,7 +171,7 @@ const usePlaceOrder = () => {
         }
       } catch (error) {
         console.error("Error fetching user addresses:", error);
-        toast.error(error.message || "Failed to fetch user address.");
+        // toast.error(error.message || "Failed to fetch user address.");
       } finally {
         dispatch({ type: "SET_LOADING_ADDRESS", payload: false });
       }
@@ -200,7 +200,7 @@ const usePlaceOrder = () => {
       try {
         itemsToUse = [JSON.parse(buyNowItem)]; // Buy Now item
       } catch (error) {
-        console.error("Error parsing buyNowItem:", error);
+        // console.error("Error parsing buyNowItem:", error);
         toast.error("Invalid buy now item data.");
         dispatch({ type: "SET_LOADING_COST", payload: false }); // Stop loading
         return;
@@ -311,7 +311,7 @@ const usePlaceOrder = () => {
 
       if (!midtransToken || !orderId) {
         dispatch({ type: "SET_LOADING", payload: false });
-        toast.error("Failed to get payment token from Midtrans.");
+        // toast.error("Failed to get payment token from Midtrans.");
         return;
       }
 
@@ -376,9 +376,9 @@ const usePlaceOrder = () => {
         window.location.href = redirect_url;
       }
     } catch (error) {
-      console.error("Error creating order:", error);
+      // console.error("Error creating order:", error);
       dispatch({ type: "SET_LOADING", payload: false });
-      toast.error(error.message || "Failed to create order.");
+      // toast.error(error.message || "Failed to create order.");
     } finally {
       dispatch({ type: "SET_LOADING", payload: false });
     }

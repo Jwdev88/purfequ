@@ -192,7 +192,7 @@ const getProducts = async (req, res) => {
 const getProductById = async (req, res) => {
   try {
     const { Id } = req.params; // Match the route definition (less recommended)
-    console.log(Id);
+    // console.log(Id);
     if (!Id) {
       return res.status(400).json({ success: false, message: "ID produk tidak valid" });
     }

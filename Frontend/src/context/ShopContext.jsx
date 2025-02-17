@@ -141,7 +141,7 @@ import React, {
             throw new Error(data.message || errorMessage);
           }
         } catch (error) {
-          notify("error", error.message || errorMessage);
+          // notify("error", error.message || errorMessage);
         } finally {
           dispatch({ type: shopActionTypes.SET_LOADING, payload: false });
         }
@@ -155,17 +155,17 @@ import React, {
           fetchData(
             `${backendUrl}/api/category/list`,
             shopActionTypes.SET_CATEGORIES,
-            "Gagal mengambil data kategori."
+            // "Gagal mengambil data kategori."
           ),
           fetchData(
             `${backendUrl}/api/subcategory/list`,
             shopActionTypes.SET_SUBCATEGORIES,
-            "Gagal mengambil data subkategori."
+            // "Gagal mengambil data subkategori."
           ),
           fetchData(
             `${backendUrl}/api/product/list`,
             shopActionTypes.SET_PRODUCTS,
-            "Gagal mengambil data produk."
+            // "Gagal mengambil data produk."
           ),
         ]);
       };
@@ -282,19 +282,18 @@ import React, {
                     type: shopActionTypes.SET_CART_ITEMS,
                     payload: response.data.cartData, // Use cartData, not cartItems
                   });
-              notify("success", "Produk berhasil ditambahkan ke keranjang.");
+              // notify("success", "Produk berhasil ditambahkan ke keranjang.");
             } else {
               throw new Error(response.data.message || "Gagal menambahkan ke keranjang.");
             }
           } catch (error) {
-              notify("error", error.message || "Gagal menambahkan ke keranjang.");
+              // notify("error", error.message || "Gagal menambahkan ke keranjang.");
           }
         }
       },
       [backendUrl, state.token, state.cartItems, updateQuantity, dispatch]
     );
   
-// --- context/ShopContext.jsx --- (Continued)
 
 const removeItemFromCart = useCallback(
     async (productId, variantId, optionId) => {
@@ -344,7 +343,7 @@ const removeItemFromCart = useCallback(
                   type: shopActionTypes.SET_CART_ITEMS,
                   payload: response.data.cartItems, // Assuming the backend returns the updated cart
                 });
-                notify("success", "Selected items removed from cart.");
+                // notify("success", "Selected items removed from cart.");
             } else {
                 throw new Error(response.data.message || "Failed to remove items from cart.");
             }
@@ -366,7 +365,7 @@ const removeItemFromCart = useCallback(
           }
         }
     } catch (error) {
-      notify("error", error.message || "Failed to clear cart.");
+      // notify("error", error.message || "Failed to clear cart.");
     }
 }, [backendUrl, state.token, dispatch]); // Add dispatch to dependencies
 

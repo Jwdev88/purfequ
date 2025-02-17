@@ -120,16 +120,16 @@ export const useProduct = () => {
           type: actionTypes.SET_ERROR,
           payload: response.data.message || "Failed to fetch product.",
         });
-        toast.error(response.data.message || "Failed to fetch product.");
+        // toast.error(response.data.message || "Failed to fetch product.");
         navigate("/collection"); // Redirect if product not found
       }
     } catch (error) {
-      console.error("Error fetching product:", error);
+      // console.error("Error fetching product:", error);
       dispatch({
         type: actionTypes.SET_ERROR,
         payload: error.message || "Failed to fetch product.",
       });
-      toast.error(error.message || "Failed to fetch product.");
+      // toast.error(error.message || "Failed to fetch product.");
       navigate("/collection"); // Redirect on error
     } finally {
       dispatch({ type: actionTypes.SET_LOADING, payload: false });
@@ -137,10 +137,10 @@ export const useProduct = () => {
   }, [productId, backendUrl, token, navigate]); // Removed 'dispatch'
 
   useEffect(() => {
-    if (productId && backendUrl && token) {
+    if (productId && backendUrl) {
       fetchProduct();
     }
-  }, [productId, backendUrl, token, fetchProduct]); // fetchProduct is now stable
+  }, [productId, backendUrl, fetchProduct]); // fetchProduct is now stable
 
   const handleVariantChange = useCallback(
     (variantName, option, variantId) => {
