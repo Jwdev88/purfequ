@@ -53,30 +53,30 @@ const populateCartData = (user) => {
 export const getUserCart = async (req, res) => {
     try {
         const userId = req.user._id || req.params.userId || req.query.userId;
-        console.log("userId:", userId); // Debug log
+        // console.log("userId:", userId); // Debug log
 
         if (!mongoose.Types.ObjectId.isValid(userId)) {
             return res.status(400).json({ success: false, message: "Invalid userId" });
         }
 
         const user = await User.findById(userId).select('cartData');
-          console.log("user", user) // Debug log
+          // console.log("user", user) // Debug log
         if (!user) {
             return res.status(404).json({ success: false, message: "User not found" });
         }
 
         const populatedUser = await user.populateCart();
-        console.log("populatedUser", populatedUser) // Debug log
+        // console.log("populatedUser", populatedUser) // Debug log
 
         const mappedCartData = populateCartData(populatedUser);
-         console.log("mappedCartData", mappedCartData) // Debug log
+        //  console.log("mappedCartData", mappedCartData) // Debug log
         res.status(200).json({
             success: true,
             cartData: mappedCartData,  // Send the MAPPED data
         });
     } catch (error) {
         console.error("Error fetching cart data:", error);
-        res.status(500).json({ success: false, message: "Failed to fetch user cart" });
+        // res.status(500).json({ success: false, message: "Failed to fetch user cart" });
     }
 };
 
@@ -89,7 +89,7 @@ export const addToCart = async (req, res) => {
         .status(400)
         .json({ success: false, message: "User not authenticated" });
     }
-      console.log("req.user", req.user)
+      // console.log("req.user", req.user)
     const fetchedProduct = await product.findById(productId);
     if (!fetchedProduct) {
       return res.status(404).json({ success: false, message: "Product not found" });
@@ -136,7 +136,7 @@ export const addToCart = async (req, res) => {
         cartData: mappedCartData, // Send the MAPPED data
     });
   } catch (error) {
-    console.error("Error adding to cart:", error);
+    // console.error("Error adding to cart:", error);
     res
       .status(500)
       .json({ success: false, message: "Failed to add item to cart" });
@@ -147,7 +147,7 @@ export const updateCart = async (req, res) => {
     try {
         const userId = req.user?._id || req.params.userId || req.query.userId;
         const { productId, variantId, optionId, quantity } = req.body;
-        console.log("Received update request:", req.body);
+        // console.log("Received update request:", req.body);
 
         if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(productId)) {
             return res.status(400).json({
@@ -208,7 +208,7 @@ export const updateCart = async (req, res) => {
         await user.save();
         const populatedUser = await user.populateCart();  // *** POPULATE ***
         const mappedCartData = populateCartData(populatedUser); // *** MAP ***
-        console.log("mappedCartData update:", mappedCartData);
+        // console.log("mappedCartData update:", mappedCartData);
 
         res.status(200).json({
             success: true,
@@ -216,7 +216,7 @@ export const updateCart = async (req, res) => {
             cartItems: mappedCartData, // *** SEND MAPPED DATA ***
         });
     } catch (error) {
-        console.error("Error updating cart:", error);
+        // console.error("Error updating cart:", error);
         res.status(500).json({
             success: false,
             message: "Server error while updating cart",
@@ -247,7 +247,7 @@ export const clearCart = async (req, res) => {
             cart: user.cartData, // Return the empty cart
         });
     } catch (error) {
-      console.error("Failed to clear cart", error); // Use console.error
+      // console.error("Failed to clear cart", error); // Use console.error
       res.status(500).json({ success: false, message: "Failed to clear cart", error:error.message }); // Kirim pesan error yang lebih baik
     }
 };
@@ -286,7 +286,7 @@ export const removeItemsFromCart = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Error removing items from cart:", error);
+    // console.error("Error removing items from cart:", error);
     res.status(500).json({ success: false, message: "Failed to remove items from cart.", error: error.message });
   }
 };

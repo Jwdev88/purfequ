@@ -58,7 +58,7 @@ const placeOrderMidtrans = async (req, res) => {
     try {
         const { items, amount, address, ongkir } = req.body;
         const userId = req.user?._id || req.params.userId || req.query.userId;
-        console.log("Received items in placeOrderMidtrans:", items); // Add this
+        ////console.log("Received items in placeOrderMidtrans:", items); // Add this
 
         if (!userId) {
             await session.abortTransaction();
@@ -142,14 +142,14 @@ const placeOrderMidtrans = async (req, res) => {
 
             } else {
                 // --- Main Product (No Variant) ---
-                console.log("Looking up product by ID (from item.id):", item.id); // Log the ID being used
+                ////console.log("Looking up product by ID (from item.id):", item.id); // Log the ID being used
                 product = await Product.findById(item.id).session(session); //  CRITICAL FIX: Use item.id
                 if (!product) {
                     await session.abortTransaction();
                     session.endSession();
                     return res.status(404).json({ success: false, message: `Produk tidak ditemukan (main)` });
                 }
-                console.log("Found product:", product);
+                ////console.log("Found product:", product);
 
                 if (product.stock < item.quantity) {
                     await session.abortTransaction();
@@ -221,7 +221,7 @@ const placeOrderMidtrans = async (req, res) => {
             item_details,
         };
 
-        console.log("Midtrans parameter:", parameter);
+        ////console.log("Midtrans parameter:", parameter);
 
         // --- Create Midtrans Transaction ---
         const transaction = await snap.createTransaction(parameter);
@@ -273,7 +273,7 @@ const handleNotification = async (req, res) => {
     session.startTransaction();
     try {
         const notification = req.body;
-        console.log("🔔 Notification received:", notification);
+        ////console.log("🔔 Notification received:", notification);
 
         // --- Validasi Dasar ---
         if (
@@ -299,7 +299,7 @@ const handleNotification = async (req, res) => {
             bank = notification.va_numbers[0].bank;
         }
 
-        console.log(`ℹ️ Order ID: ${orderId}, Transaction Status: ${transactionStatus}, Fraud Status: ${fraudStatus}, Payment Type: ${paymentType}, VA Number: ${vaNumber}, Bank: ${bank}`);
+        ////console.log(`ℹ️ Order ID: ${orderId}, Transaction Status: ${transactionStatus}, Fraud Status: ${fraudStatus}, Payment Type: ${paymentType}, VA Number: ${vaNumber}, Bank: ${bank}`);
 
         let newStatus = "pending";
         let paymentStatus = false;
@@ -327,7 +327,7 @@ const handleNotification = async (req, res) => {
             paymentStatus = false;
         }
 
-        console.log(`ℹ️ New status to be updated: ${newStatus}, Payment status: ${paymentStatus}`);
+        ////console.log(`ℹ️ New status to be updated: ${newStatus}, Payment status: ${paymentStatus}`);
 
         // --- Cari dan Perbarui Pesanan ---
         const updatedOrder = await orderModel.findOneAndUpdate(
@@ -349,19 +349,19 @@ const handleNotification = async (req, res) => {
             return res.status(404).send("Order not found");
         }
 
-        console.log("✅ Order found and updated (status, payment):", updatedOrder);
+        ////console.log("✅ Order found and updated (status, payment):", updatedOrder);
 
         // --- Pengurangan Stok (Hanya Jika Pembayaran Berhasil) ---
         if (newStatus === "paid") {
-            console.log("ℹ️ Starting stock reduction...");
+            ////console.log("ℹ️ Starting stock reduction...");
 
             for (const item of updatedOrder.items) {
-                console.log(`\n--- Processing item:`, item);
+                ////console.log(`\n--- Processing item:`, item);
                 let product;
 
                 if (item.variant && item.variant.variantId) {
                     // --- Update Stok untuk Varian ---
-                    console.log("ℹ️ Item has a variant.  Updating variant stock...");
+                    ////console.log("ℹ️ Item has a variant.  Updating variant stock...");
 
                     // 1.  Cari Produk
                     product = await Product.findOne({
@@ -376,7 +376,7 @@ const handleNotification = async (req, res) => {
                         console.error(`❌ Product not found for variant ID: ${item.variant.variantId}, option ID: ${item.variant.selectedOption.optionId}`);
                         throw new Error(`Product not found for variant/option`);
                     }
-                    console.log("✅ Product found:", product.name);
+                    ////console.log("✅ Product found:", product.name);
 
 
                    // 2.  Temukan varian (gunakan _id)
@@ -387,7 +387,7 @@ const handleNotification = async (req, res) => {
                       session.endSession();
                       throw new Error(`Variant not found: ${item.variant.variantId}`);
                     }
-                    console.log("✅ Variant found:", variant.name);
+                    ////console.log("✅ Variant found:", variant.name);
 
                     // 3. Temukan Opsi Varian
                     const option = variant.options.find(o => o._id.toString() === item.variant.selectedOption.optionId.toString()); // Use toString()
@@ -396,7 +396,7 @@ const handleNotification = async (req, res) => {
                         session.endSession();
                         throw new Error(`Variant option not found: ${item.variant.selectedOption.optionId}`);
                      }
-                    console.log("✅ Option found:", option.name, "Current Stock:", option.stock);
+                    //////console.log("✅ Option found:", option.name, "Current Stock:", option.stock);
 
                     // 4.  Validasi Stok (sebelum update)
                     if (option.stock < item.quantity) {
@@ -418,7 +418,7 @@ const handleNotification = async (req, res) => {
                             session, // Sangat penting:  Gunakan session!
                         }
                     );
-                    console.log("🔄 Stock update result:", updateResult);
+                    ////console.log("🔄 Stock update result:", updateResult);
 
 
                     // 6.  Validasi Hasil Update
@@ -429,12 +429,12 @@ const handleNotification = async (req, res) => {
                         throw new Error(`Failed to update stock for variant option: ${option.sku}`);
                     }
 
-                    console.log(`✅ Stock updated successfully for variant option.  Reduced by: ${item.quantity}`);
+                    ////console.log(`✅ Stock updated successfully for variant option.  Reduced by: ${item.quantity}`);
 
 
                 } else {
                     // --- Update Stok untuk Produk Utama (Tanpa Varian) ---
-                    console.log("ℹ️ Item is a main product. Updating main product stock...");
+                    ////console.log("ℹ️ Item is a main product. Updating main product stock...");
 
                     // 1. Cari Produk (berdasarkan ID Produk)
                     product = await Product.findById(item.productId).session(session); // Perbaikan: Gunakan item.productId
@@ -445,7 +445,7 @@ const handleNotification = async (req, res) => {
                         throw new Error(`Product not found for ID: ${item.productId}`);
                     }
 
-                    console.log("✅ Product found:", product.name);
+                    ////console.log("✅ Product found:", product.name);
 
                     // 2. Validasi Stok
                     if (product.stock < item.quantity) {
@@ -459,15 +459,15 @@ const handleNotification = async (req, res) => {
                     product.stock -= item.quantity;
                     await product.save({ session }); // Gunakan session!
 
-                    console.log(`✅ Main product stock updated successfully. Reduced by: ${item.quantity}`);
+                    // ////console.log(`✅ Main product stock updated successfully. Reduced by: ${item.quantity}`);
                 }
             }
-            console.log("ℹ️ Stock reduction completed.");
+            // ////console.log("ℹ️ Stock reduction completed.");
         }
 
         await session.commitTransaction();
         session.endSession();
-        console.log("✅✅✅ Transaction completed successfully.  Order and stock updated.");
+        // ////console.log("✅✅✅ Transaction completed successfully.  Order and stock updated.");
         res.status(200).json({ success: true, message: "OK" });
     } catch (error) {
         await session.abortTransaction();
@@ -565,7 +565,7 @@ const updateStatus = async (req, res) => {
   
       res.json({ success: true, message: "Status Update", order: updatedOrder });
     } catch (error) {
-      console.log(error);
+    //   ////console.log(error);
       res.json({ success: false, message: error.message });
     }
   };

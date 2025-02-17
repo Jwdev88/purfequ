@@ -9,7 +9,7 @@ const rajaOngkirController = {
         try {
             const cachedProvinces = cache.get('provinces');
             if (cachedProvinces) {
-                console.log('Using cached provinces data.');
+                ////console.log('Using cached provinces data.');
                 return res.json({ success: true, provinces: cachedProvinces });
             }
 
@@ -43,7 +43,7 @@ const rajaOngkirController = {
 
             const cachedCities = cache.get(`cities-${provinceId}`);
             if (cachedCities) {
-                console.log('Using cached cities data.');
+                ////console.log('Using cached cities data.');
                 return res.json({ success: true, cities: cachedCities });
             }
 
@@ -82,10 +82,10 @@ const rajaOngkirController = {
             const cachedCost = cache.get(cacheKey);
 
             if (cachedCost) {
-                console.log('Menggunakan data biaya pengiriman dari cache.');
+                ////console.log('Menggunakan data biaya pengiriman dari cache.');
                 return res.json({ success: true, costs: cachedCost }); //Format yang konsisten
             }
-            // console.log("Data Dari req.body",req.body)
+            // ////console.log("Data Dari req.body",req.body)
             const response = await axios.post('https://api.rajaongkir.com/starter/cost', {
                 origin,
                 destination,
@@ -96,7 +96,7 @@ const rajaOngkirController = {
                     key: process.env.API_RAJA_ONGKIR
                 }
             });
-            // console.log("Cek Response:",response.data)
+            // ////console.log("Cek Response:",response.data)
             const costs = response.data.rajaongkir.results[0]?.costs; //optional chaining
 
             if (!costs) {

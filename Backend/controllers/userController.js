@@ -5,81 +5,55 @@ import userModel from "../models/userModel.js";
 import jwt from "jsonwebtoken";
 
 // --- Helper Functions ---
+
+// Create a JWT token.  This is used after successful login/registration.
 const createToken = (id) => {
   return jwt.sign({ userId: id }, process.env.JWT_SECRET, { expiresIn: "1d" });
 };
 
-// --- Get User from Token (Middleware - Keep this!) ---
-export const getUserFromToken = async (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1]; // "Bearer TOKEN"
-
-  if (!token) {
-    return res.status(401).json({ message: 'Unauthorized: No token provided' });
-  }
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await userModel.findById(decoded.userId);  // Use decoded.userId
-
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    req.user = user;
-    req.userId = decoded.userId; // Set userId  <-- IMPORTANT
-    next();
-  } catch (error) {
-    console.error(error); // Log the error for debugging
-      if (error.name === 'TokenExpiredError') {
-        return res.status(401).json({ message: 'Unauthorized: Token expired' });
-      }
-    return res.status(401).json({ message: 'Unauthorized: Invalid token' });
-  }
-};
-
-
-
 // --- Controller Functions ---
 
-// 1. Update Profile (Corrected)
+// 1. Update Profile
 export const updateProfile = async (req, res) => {
   try {
-    const userId = req.userId; // Get ID from middleware
+    const userId = req.userId; // Get ID from authUser middleware
     const { name, email, currentPassword, newPassword, confirmNewPassword } = req.body;
 
     const user = await userModel.findById(userId);
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "User not found", success: false });
     }
 
-    // Update Name
+    // Update Name (if provided)
     if (name) {
       user.name = name;
     }
 
-    // Update Email
+    // Update Email (if provided)
     if (email) {
       if (!validator.isEmail(email)) {
-        return res.status(400).json({ message: "Invalid email format." });
+        return res.status(400).json({ message: "Invalid email format.", success: false });
       }
+      // Check if the new email is already in use by *another* user.
       const emailExists = await userModel.findOne({ email, _id: { $ne: userId } });
       if (emailExists) {
-        return res.status(400).json({ message: "Email already in use." });
+        return res.status(400).json({ message: "Email already in use.", success: false });
       }
       user.email = email;
     }
 
-    // Update Password
+    // Update Password (if provided)
     if (currentPassword && newPassword) {
       if (newPassword.length < 8) {
-        return res.status(400).json({ message: "New password must be at least 8 characters." });
+        return res.status(400).json({ message: "New password must be at least 8 characters.", success: false });
       }
       if (newPassword !== confirmNewPassword) {
-        return res.status(400).json({ message: "New password and confirmation do not match." });
+        return res.status(400).json({ message: "New password and confirmation do not match.", success: false });
       }
+      // Verify the current password before updating.
       const isMatch = await bcrypt.compare(currentPassword, user.password);
       if (!isMatch) {
-        return res.status(401).json({ message: "Incorrect current password." });
+        return res.status(401).json({ message: "Incorrect current password.", success: false });
       }
 
       const salt = await bcrypt.genSalt(10);
@@ -88,18 +62,17 @@ export const updateProfile = async (req, res) => {
     }
 
     await user.save();
-    res.json({ success: true, message: "Profile updated successfully.", user: { name: user.name, email: user.email } }); // Return success: true
+    res.json({ success: true, message: "Profile updated successfully.", user: { name: user.name, email: user.email } });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ success: false, message: "Error updating profile.", error: error.message }); // Return success: false
+    res.status(500).json({ success: false, message: "Error updating profile.", error: error.message });
   }
 };
 
-
-// 2. Add Address (Corrected)
+// 2. Add Address
 export const addAddress = async (req, res) => {
     try {
-        const userId = req.userId;  // Get ID from middleware
+        const userId = req.userId;  // Get ID from authUser middleware
         const { firstName, lastName, email, phone, street, city, province, postalCode, cityId, provinceId } = req.body;
 
         if (!firstName || !lastName || !email || !phone || !street || !city || !postalCode || !cityId || !provinceId) {
@@ -115,20 +88,19 @@ export const addAddress = async (req, res) => {
         user.address.push(newAddress);
         await user.save();
 
-        res.status(201).json({ success: true, message: 'Address added successfully', address: newAddress }); // Return success: true and the *new* address
+        res.status(201).json({ success: true, message: 'Address added successfully', address: newAddress });
 
     } catch (error) {
         console.error(error);
-        res.status(500).json({ success: false, message: 'Error adding address', error: error.message }); // Return success: false
+        res.status(500).json({ success: false, message: 'Error adding address', error: error.message });
     }
 };
 
-
-// 3. Update Address (Corrected)
+// 3. Update Address
 export const updateAddress = async (req, res) => {
     try {
-        const userId = req.userId; // Get ID from middleware
-        const { addressId } = req.params;
+        const userId = req.userId; // Get ID from authUser middleware
+        const { addressId } = req.params;  // Get addressId from URL parameters
         const { firstName, lastName, email, phone, street, city, cityId, postalCode, province, provinceId } = req.body;
 
         const user = await userModel.findById(userId);
@@ -136,36 +108,38 @@ export const updateAddress = async (req, res) => {
             return res.status(404).json({success: false, message: 'User not found' });
         }
 
-        const addressToUpdate = user.address.id(addressId); // Use .id() to find subdocument
+        // Find the address subdocument by its ID.
+        const addressToUpdate = user.address.id(addressId);
         if (!addressToUpdate) {
             return res.status(404).json({success: false, message: 'Address not found' });
         }
 
-        // Update fields (use optional chaining to avoid errors if field is not provided)
-        if (firstName) addressToUpdate.firstName = firstName;
-        if (lastName) addressToUpdate.lastName = lastName;
-        if (email) addressToUpdate.email = email;
-        if (phone) addressToUpdate.phone = phone;
-        if (street) addressToUpdate.street = street;
-        if (city) addressToUpdate.city = city;
-        if (cityId) addressToUpdate.cityId = cityId;
-        if (postalCode) addressToUpdate.postalCode = postalCode;
-        if (province) addressToUpdate.province = province;
-        if (provinceId) addressToUpdate.provinceId = provinceId;
+      // Update fields (if provided)
+      if (firstName) addressToUpdate.firstName = firstName;
+      if (lastName) addressToUpdate.lastName = lastName;
+      if (email) addressToUpdate.email = email;
+      if (phone) addressToUpdate.phone = phone;
+      if (street) addressToUpdate.street = street;
+      if (city) addressToUpdate.city = city;
+      if (cityId) addressToUpdate.cityId = cityId;
+      if (postalCode) addressToUpdate.postalCode = postalCode;
+      if (province) addressToUpdate.province = province;
+      if (provinceId) addressToUpdate.provinceId = provinceId;
+
 
         await user.save();
-        res.json({ success: true, message: 'Address updated successfully', address: addressToUpdate }); // Return success: true
+        res.json({ success: true, message: 'Address updated successfully', address: addressToUpdate });
 
     } catch (error) {
         console.error(error);
-        res.status(500).json({ success:false, message: 'Error updating address', error: error.message }); // Return success: false
+        res.status(500).json({ success:false, message: 'Error updating address', error: error.message });
     }
 };
 
-// 4. Delete Address (Corrected)
+// 4. Delete Address
 export const deleteAddress = async (req, res) => {
   try {
-    const userId = req.userId; // Get ID from middleware
+    const userId = req.userId; // Get ID from authUser middleware
     const { addressId } = req.params;
 
     const user = await userModel.findById(userId);
@@ -173,51 +147,51 @@ export const deleteAddress = async (req, res) => {
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
-      // Use .pull() to remove the subdocument
+      // Remove the address subdocument using .pull().
       user.address.pull({ _id: addressId });
       await user.save();
-      res.status(200).json({ success: true, message: "Address deleted successfully" }); // Return success: true
+      res.status(200).json({ success: true, message: "Address deleted successfully" });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ success: false, message: "Error deleting address", error: error.message }); // Return success: false
+    res.status(500).json({ success: false, message: "Error deleting address", error: error.message });
   }
 };
 
-// 5. Get User Addresses (Corrected)
+// 5. Get User Addresses
 export const getAddresses = async (req, res) => {
   try {
-    const userId = req.userId;  // Get ID from middleware
+    const userId = req.userId;  // Get ID from authUser middleware
     const user = await userModel.findById(userId);
     if (!user) {
       return res.status(404).json({success: false, message: "User not found" });
     }
-    res.status(200).json({ success: true, addresses: user.address }); // Return success: true
+    res.status(200).json({ success: true, addresses: user.address });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ success: false, message: "Error get user address", error: error.message }); // Return success: false
+    res.status(500).json({ success: false, message: "Error get user address", error: error.message });
   }
 };
 
-// 6. Get User Data (Excluding Password) (Corrected)
+// 6. Get User Data (Excluding Password)
 export const getUser = async (req, res) => {
     try {
-        const userId = req.userId;  // Get ID from middleware
-        const user = await userModel.findById(userId).select('-password'); // Exclude password
+        const userId = req.userId;  // Get ID from authUser middleware
+        // Find the user and exclude the 'password' field.
+        const user = await userModel.findById(userId).select('-password');
         if (!user) {
             return res.status(404).json({success: false, message: "User not found" });
         }
-        res.status(200).json({success: true, user});  // Consistent success: true
+        res.status(200).json({success: true, user});
     } catch (error) {
         console.error(error);
-        res.status(500).json({ success: false, message: "Error getting user data", error: error.message }); // Return success: false
+        res.status(500).json({ success: false, message: "Error getting user data", error: error.message });
     }
 };
 
-
-// 7. Get Address by ID (Corrected)
+// 7. Get Address by ID
 export const getAddressById = async (req, res) => {
   try {
-    const userId = req.userId;
+    const userId = req.userId; // Get ID from authUser middleware
     const { addressId } = req.params;
 
     const user = await userModel.findById(userId);
@@ -225,94 +199,111 @@ export const getAddressById = async (req, res) => {
       return res.status(404).json({ success:false, message: "User not found" });
     }
 
+    // Find the address subdocument by its ID.
     const address = user.address.id(addressId);
     if (!address) {
       return res.status(404).json({success: false, message: "Address not found" });
     }
 
-    res.status(200).json({ success: true, address }); // Return success: true and the address
+    res.status(200).json({ success: true, address });
   } catch (error) {
     console.error("Error fetching address:", error);
-    res.status(500).json({ success: false, message: "Error fetching address", error: error.message }); // Return success: false
+    res.status(500).json({ success: false, message: "Error fetching address", error: error.message });
   }
 };
 
-// --- Auth Functions (Login, Register, Admin Login) ---
-// (Keep these as you have them, but I'm including them for completeness)
+// --- Auth Functions ---
+
+// Register a new user.
 export const registerUser = async (req, res) => {
-    try {
-      const { name, email, password } = req.body;
-  
-      const exists = await userModel.findOne({ email });
-      if (exists) {
-        return res.status(400).json({success: false, message: "Email already registered." }); // 400 Bad Request
-      }
-  
-      if (!validator.isEmail(email)) {
-        return res.status(400).json({ success: false, message: "Invalid email format." });
-      }
-      if (password.length < 8) {
-        return res.status(400).json({ success: false, message: "Password must be at least 8 characters." });
-      }
-  
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(password, salt);
-  
-      const newUser = new userModel({
-        name,
-        email,
-        password: hashedPassword,
-      });
-  
-      const user = await newUser.save();
-      const token = createToken(user._id);
-      res.status(201).json({success: true, token }); // 201 Created
-  
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ success: false, message: "Registration failed", error: error.message });
-    }
-  };
-  
-  export const loginUser = async (req, res) => {
-    try {
-        const {email, password } = req.body;
-        const user = await userModel.findOne({ email });
-        if (!user) {
-            return res.status(401).json({ success: false, message: "Email tidak ditemukan" }); // Use 401 for auth errors
-        }
-        const isMatch = await bcrypt.compare(password,user.password)
+  try {
+    const { name, email, password } = req.body;
 
-        if(isMatch){
-           const token = jwt.sign(
-             { userId: user._id }, // Payload
-             process.env.JWT_SECRET, // Secret key
-             { expiresIn: "1d" } // Masa berlaku token
-           );
-            res.status(200).json({success:true, token}) // Return success: true
-        }
-        else{
-            return res.status(401).json({ success: false, message: "email atau password salah" });
-        }
-
-    } catch (error) {
-      console.log(error);
-      res.status(500).json({ success: false, message: error.message });
+    // Check if the email is already registered.
+    const exists = await userModel.findOne({ email });
+    if (exists) {
+      return res.status(400).json({success: false, message: "Email already registered." });
     }
-  };
 
-  export const adminLogin = async (req, res) => {
-    try {
-      const { email, password } = req.body;
-  
-      if (email === process.env.ADMIN_EMAIL && password === process.env.ADMIN_PASSWORD) {
-        const token = jwt.sign({ email, password }, process.env.JWT_SECRET); // Payload for admin
-        res.status(200).json({success: true, token }); // Return success: true
-      } else {
-        res.status(401).json({ success: false, message: "Kredensial salah" }); // 401 Unauthorized
+    // Validate email format.
+    if (!validator.isEmail(email)) {
+      return res.status(400).json({ success: false, message: "Invalid email format." });
+    }
+    // Validate password length.
+    if (password.length < 8) {
+      return res.status(400).json({ success: false, message: "Password must be at least 8 characters." });
+    }
+
+    // Hash the password.
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Create a new user.
+    const newUser = new userModel({
+      name,
+      email,
+      password: hashedPassword,
+    });
+
+    const user = await newUser.save();
+    // Create a JWT token for the new user.
+    const token = createToken(user._id);
+    res.status(201).json({success: true, token });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Registration failed", error: error.message });
+  }
+};
+
+// Log in an existing user.
+export const loginUser = async (req, res) => {
+  try {
+      const {email, password } = req.body;
+      console.log("Login attempt for email:", email,password); // Debug: Log email being used to login
+
+      // Find the user by email.
+       // Find the user by email.
+      const user = await userModel.findOne({ email });
+      if (!user) {
+          return res.status(401).json({ success: false, message: "Email tidak ditemukan" });
       }
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ success: false, message: error.message });
+      // Compare the entered password with the hashed password.
+      const isMatch = await bcrypt.compare(password, user.password);
+
+      if(isMatch){
+           // Create a JWT token.
+          const token = jwt.sign(
+            { userId: user._id },
+            process.env.JWT_SECRET,
+            { expiresIn: "1d" }
+          );
+          res.status(200).json({success:true, token})
+      }
+      else{
+          return res.status(401).json({ success: false, message: "email atau password salah" });
+      }
+
+  } catch (error) {
+    console.error(error); // Log the error for debugging.
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Admin login (separate from user login).
+export const adminLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Check if the provided credentials match the admin credentials.
+    if (email === process.env.ADMIN_EMAIL && password === process.env.ADMIN_PASSWORD) {
+      const token = jwt.sign({ email, password }, process.env.JWT_SECRET); // Simple payload
+      res.status(200).json({success: true, token });
+    } else {
+      res.status(401).json({ success: false, message: "Kredensial salah" });
     }
-  };
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

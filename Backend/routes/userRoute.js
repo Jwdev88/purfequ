@@ -10,7 +10,6 @@ import {
     getAddresses,
     getUser,
     getAddressById,
-    getUserFromToken
 } from "../controllers/userController.js"; // Path yang benar
 import authUser from "../middleware/Auth.js";
 

@@ -9,15 +9,17 @@
     "test": "jest",
     "test:coverage": "jest --coverage",
     "jest": {
-      "setupFilesAfterEnv": ["./jest.setup.js"]
-  }
+      "setupFilesAfterEnv": [
+        "./jest.setup.js"
+      ]
+    }
   },
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
     "@faker-js/faker": "^9.4.0",
-    "bcrypt": "^5.1.1",
+    "bcrypt": "^5.0.1",
     "cloudinary": "^2.5.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

@@ -18,7 +18,7 @@ const addProduct = async (req, res) => {
       sku,
     } = req.body;
 
-    console.log("req.body:", req.body);
+    ////////console.log("req.body:", req.body);
 
     // Handle image uploads
     const image1 = req.files?.image1?.[0];
@@ -187,39 +187,35 @@ const getProducts = async (req, res) => {
       .json({ success: false, message: "Gagal memuat data produk" });
   }
 };
-// backend/controllers/productController.js
+
+// productController.js
 const getProductById = async (req, res) => {
   try {
-    const { Id } = req.params;
-    console.log("getProductById - Id:", Id);
-
-    if (!Id || !mongoose.Types.ObjectId.isValid(Id)) {
+    const { Id } = req.params; // Match the route definition (less recommended)
+    console.log(Id);
+    if (!Id) {
       return res.status(400).json({ success: false, message: "ID produk tidak valid" });
     }
 
-    const product = await Product.findById(Id)
-      .populate("category", "name") // Populate ONLY the 'name' field
-      .populate("subCategory", "name") // Populate ONLY the 'name' field
+    const product = await Product.findById(Id) // Use Id here
+      .populate("category", "name")
+      .populate("subCategory", "name")
       .populate({
-        path: "variants.options", // Populate options within variants
-        select: "name price stock sku weight optionName", // Select only necessary fields
+        path: "variants.options",
+        select: "name price stock sku weight",
       });
-
-
-    console.log("getProductById - product:", product);
 
     if (!product) {
       return res.status(404).json({ success: false, message: "Produk tidak ditemukan" });
     }
 
-    // ALWAYS return an object with a success flag:
-    res.status(200).json({ success: true, product }); // 200 OK
+    res.status(200).json({ success: true, product });
   } catch (error) {
     console.error("Error retrieving product:", error);
-     // ALWAYS return a JSON response, even on error:
     res.status(500).json({ success: false, message: "Terjadi kesalahan server", error: error.message });
   }
 };
+// ... (rest of productController.js)
 const deleteProduct = async (req, res) => {
   const { productId } = req.body;
   try {

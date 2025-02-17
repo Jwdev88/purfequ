@@ -38,7 +38,7 @@ const productSchema = new mongoose.Schema(
         },
         variants: [variantSchema], // Array of variants
         bestSeller: { type: Boolean, default: false },
-        rating: { type: Number, default: 5, min: 0, max: 5 },
+        rating: { type: Number, default: 0, min: 0, max: 5 },
     },
     {
         timestamps: true,

@@ -1,7 +1,6 @@
 // backend/models/userModel.js
 import mongoose from "mongoose";
 import Product from "../models/productModel.js";
-import bcrypt from 'bcrypt';
 // Skema untuk Item Keranjang (cartItemSchema) - Disederhanakan
 const cartItemSchema = new mongoose.Schema({
     productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true }, // Ref ke Product
@@ -42,19 +41,9 @@ const userSchema = new mongoose.Schema(
     }
 );
 
-// --- Hashing Password (Penting) ---
-userSchema.methods.matchPassword = async function (enteredPassword) {
-    return await bcrypt.compare(enteredPassword, this.password);
-};
 
-// Hash password before saving
-userSchema.pre("save", async function (next) {
-    if (!this.isModified("password")) {
-        next();
-    }
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
-});
+
+
 
 // --- Custom populate method for cart (CORRECTED) ---
 userSchema.methods.populateCart = async function () {
