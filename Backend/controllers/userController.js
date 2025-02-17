@@ -260,7 +260,7 @@ export const registerUser = async (req, res) => {
 export const loginUser = async (req, res) => {
   try {
       const {email, password } = req.body;
-      console.log("Login attempt for email:", email,password); // Debug: Log email being used to login
+      // console.log("Login attempt for email:", email,password); // Debug: Log email being used to login
 
       // Find the user by email.
        // Find the user by email.

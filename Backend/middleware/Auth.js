@@ -12,10 +12,10 @@ const authUser = async (req, res, next) => {
     }
 
     const token = authHeader.replace("Bearer ", ""); // Correctly removes "Bearer "
-    console.log("Received token:", token); // Debug: Log the token -  Remove in production
+    // console.log("Received token:", token); // Debug: Log the token -  Remove in production
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET); // Correct jwt.verify and env variable
-    console.log("Decoded payload:", decoded); // Debug: Log the decoded payload - Remove in production
+    // console.log("Decoded payload:", decoded); // Debug: Log the decoded payload - Remove in production
 
     const user = await userModel.findById(decoded.userId); // Correct: using decoded.userId
 
